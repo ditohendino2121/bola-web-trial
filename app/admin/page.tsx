@@ -6,7 +6,7 @@ import {
   POSISI_MAIN, STATUS_LABEL, tunggakanOf, hargaSekali, totalTunggakanRp,
 } from "../../lib/store";
 import { supa, fetchAll, adminUpdate, adminInsert, adminDelete } from "../../lib/db";
-import { downloadCSV, today, acakTim } from "../../lib/export";
+import { downloadCSV, today, acakTim, buildWAList } from "../../lib/export";
 
 export default function Admin() {
   const [db, setDb] = useState<any>(null);
@@ -240,18 +240,12 @@ export default function Admin() {
 
   const salinWA = () => {
     if (!jadwal) return;
-    let t = `📋 LIST MAIN — ${jadwal.tanggal} ${jadwal.jam}\n📍 ${jadwal.lokasi}\n\n`;
-    POSISI_MAIN.forEach((p) => {
-      const arr = roster.filter((r: any) => (r.posisi || "Depan") === p);
-      t += `*${p} (${arr.length}/${quotaPosisi(jadwal, p)})*\n`;
-      arr.forEach((r: any, i: number) => {
-        const mark = r.status === "confirmed_lunas" ? "✅" : r.status === "confirmed_langsung" ? "💵" : "⏳";
-        t += `${i + 1}. ${namaOf(r.userId)} ${mark}\n`;
-      });
-      t += "\n";
-    });
-    t += `Total ${roster.length}/${kuotaAktif(jadwal)} • ✅ lunas • 💵 bayar di tempat • ⏳ utang`;
-    const done = () => alert("List tersalin! Paste ke grup WA ✅");
+    const t = buildWAList(
+      jadwal,
+      (p) => quotaPosisi(jadwal, p as any),
+      (p) => roster.filter((r: any) => (r.posisi || "Depan") === p).map((r: any) => namaOf(r.userId)),
+    );
+    const done = () => alert("Template WA tersalin! Paste ke grup ✅");
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t).then(done).catch(() => { prompt("Copy manual:", t); });
     else prompt("Copy manual:", t);
   };

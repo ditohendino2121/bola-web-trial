@@ -106,8 +106,12 @@ export default function AdminJadwal() {
     await run(async () => {
       const { supa } = await import("../../../lib/supabase");
       for (const r of lunas) {
-        const w = db.wallets[r.userId] || { paket: 0, reguler: 0 };
-        const { error } = await supa().from("wallets").upsert({ user_id: r.userId, paket: w.paket, reguler: w.reguler + 1 });
+        const w = db.wallets[r.userId] || { paket: 0, reguler: 0, paket_gk: 0, reguler_gk: 0 };
+        const gk = (r as any).pakaiGk ?? (r.posisi === "GK");
+        const { error } = await supa().from("wallets").upsert({
+          user_id: r.userId, paket: w.paket, reguler: w.reguler + (!gk ? 1 : 0),
+          paket_gk: w.paket_gk, reguler_gk: w.reguler_gk + (gk ? 1 : 0),
+        });
         if (error) throw new Error(error.message);
       }
       await adminDelete("schedules", id);

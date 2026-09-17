@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   walletOf, listAktif, kuotaAktif, quotaPosisi,
-  POSISI_MAIN, STATUS_LABEL, tunggakanOf,
+  POSISI_MAIN, STATUS_LABEL, tunggakanOf, hargaSekali, totalTunggakanRp,
 } from "../../lib/store";
 import { supa, fetchAll, adminUpdate, adminInsert, adminDelete } from "../../lib/db";
 import { downloadCSV, today, acakTim } from "../../lib/export";
@@ -52,9 +52,12 @@ export default function Admin() {
       if (ok) {
         await adminUpdate("txs", txId, { status: "success" });
         const w = walletOf(db, t.userId);
-        const patch = t.paket === "4x" ? { paket: w.paket + 4 } : { reguler: w.reguler + 1 };
+        const gk = !!t.isGk;
+        const patch = t.paket === "4x"
+          ? (gk ? { paket_gk: w.paket_gk + 4 } : { paket: w.paket + 4 })
+          : (gk ? { reguler_gk: w.reguler_gk + 1 } : { reguler: w.reguler + 1 });
         // upsert wallet
-        const { error } = await sb().from("wallets").upsert({ user_id: t.userId, ...{ paket: walletOf(db, t.userId).paket, reguler: walletOf(db, t.userId).reguler, ...patch } });
+        const { error } = await sb().from("wallets").upsert({ user_id: t.userId, paket: w.paket, reguler: w.reguler, paket_gk: w.paket_gk, reguler_gk: w.reguler_gk, ...patch });
         if (error) throw new Error(error.message);
         if (t.paket === "4x") await adminUpdate("profiles", t.userId, { is_member: true });
       } else {
@@ -63,27 +66,36 @@ export default function Admin() {
     });
   };
 
-  const manualTopup = (userId: string, kind: "1x" | "4x") =>
+  const manualTopup = (userId: string, kind: "1x" | "4x", isGK = false) =>
     run(async () => {
       const w = walletOf(db, userId);
-      const patch = kind === "1x" ? { reguler: w.reguler + 1 } : { paket: w.paket + 4 };
-      const { error } = await sb().from("wallets").upsert({ user_id: userId, paket: w.paket, reguler: w.reguler, ...patch });
+      const patch = kind === "1x"
+        ? (isGK ? { reguler_gk: w.reguler_gk + 1 } : { reguler: w.reguler + 1 })
+        : (isGK ? { paket_gk: w.paket_gk + 4 } : { paket: w.paket + 4 });
+      const rp = kind === "1x" ? (isGK ? 15000 : 25000) : (isGK ? 50000 : 90000);
+      const { error } = await sb().from("wallets").upsert({ user_id: userId, paket: w.paket, reguler: w.reguler, paket_gk: w.paket_gk, reguler_gk: w.reguler_gk, ...patch });
       if (error) throw new Error(error.message);
       await adminInsert("txs", {
-        user_id: userId, label: `Top-up manual ${kind} (cash)`,
+        user_id: userId, label: `Top-up manual ${kind}${isGK ? " (harga GK)" : ""} (cash)`,
         kredit_paket: kind === "4x" ? 4 : 0, kredit_reguler: kind === "1x" ? 1 : 0,
-        rupiah: kind === "1x" ? 25000 : 90000, metode: "manual_cash", status: "success",
+        rupiah: rp, metode: "manual_cash", status: "success", is_gk: isGK,
       });
       if (kind === "4x") await adminUpdate("profiles", userId, { is_member: true });
     });
 
-  const kurangiKredit = async (userId: string, kind: "paket" | "reguler") => {
+  const kurangiKredit = async (userId: string, kind: "paket" | "reguler" | "paket_gk" | "reguler_gk") => {
     const w = walletOf(db, userId);
     if ((w[kind] || 0) < 1) return alert("Kreditnya sudah 0");
     const alasan = prompt(`Kurangi 1 kredit ${kind} untuk ${namaOf(userId)}?\nIsi alasan (cth: walk-in tanpa list, koreksi):`);
     if (alasan === null) return;
     await run(async () => {
-      const { error } = await sb().from("wallets").upsert({ user_id: userId, paket: w.paket - (kind === "paket" ? 1 : 0), reguler: w.reguler - (kind === "reguler" ? 1 : 0) });
+      const { error } = await sb().from("wallets").upsert({
+        user_id: userId,
+        paket: w.paket - (kind === "paket" ? 1 : 0),
+        reguler: w.reguler - (kind === "reguler" ? 1 : 0),
+        paket_gk: w.paket_gk - (kind === "paket_gk" ? 1 : 0),
+        reguler_gk: w.reguler_gk - (kind === "reguler_gk" ? 1 : 0),
+      });
       if (error) throw new Error(error.message);
       await adminInsert("txs", {
         user_id: userId, label: `Kurangi 1 kredit ${kind} manual`, rupiah: 0,
@@ -120,10 +132,13 @@ export default function Admin() {
     await run(async () => {
       if (t.status === "success" && granted > 0) {
         const w = walletOf(db, t.userId);
+        const gk = !!t.isGk;
         const { error } = await sb().from("wallets").upsert({
           user_id: t.userId,
-          paket: Math.max(0, w.paket - (t.kreditPaket || 0)),
-          reguler: Math.max(0, w.reguler - (t.kreditReguler || 0)),
+          paket: Math.max(0, w.paket - (!gk ? (t.kreditPaket || 0) : 0)),
+          reguler: Math.max(0, w.reguler - (!gk ? (t.kreditReguler || 0) : 0)),
+          paket_gk: Math.max(0, w.paket_gk - (gk ? (t.kreditPaket || 0) : 0)),
+          reguler_gk: Math.max(0, w.reguler_gk - (gk ? (t.kreditReguler || 0) : 0)),
         });
         if (error) throw new Error(error.message);
       }
@@ -135,16 +150,18 @@ export default function Admin() {
     run(async () => {
       const r = db.rsvps.find((x: any) => x.id === rsvpId);
       if (!r) return;
+      const nominal = hargaSekali(r.posisi || "");
+      const nominalStr = nominal.toLocaleString("id-ID");
       if (aksi === "lunas") {
         await adminUpdate("rsvps", rsvpId, { status: "confirmed_lunas" });
         await adminInsert("txs", {
-          user_id: r.userId, label: "Pelunasan di lapangan (25rb)", rupiah: 25000,
+          user_id: r.userId, label: `Pelunasan di lapangan (${nominalStr})`, rupiah: nominal,
           metode: "pelunasan_cash", status: "success",
         });
       } else if (aksi === "belum") {
         await adminUpdate("rsvps", rsvpId, { status: "wajib_bayar" });
         await adminInsert("txs", {
-          user_id: r.userId, label: "Tunggakan: hadir tapi belum bayar (25rb)", rupiah: 25000,
+          user_id: r.userId, label: `Tunggakan: hadir tapi belum bayar (${nominalStr})`, rupiah: nominal,
           metode: "tagihan", status: "success",
         });
       } else {
@@ -153,7 +170,7 @@ export default function Admin() {
         } else {
           await adminUpdate("rsvps", rsvpId, { status: "wajib_bayar" });
           await adminInsert("txs", {
-            user_id: r.userId, label: "Tunggakan: tidak datang & belum bayar (25rb)", rupiah: 25000,
+            user_id: r.userId, label: `Tunggakan: tidak datang & belum bayar (${nominalStr})`, rupiah: nominal,
             metode: "tagihan", status: "success",
           });
         }
@@ -181,16 +198,28 @@ export default function Admin() {
       if (roster.length >= kuotaAktif(jadwal)) return alert("Kuota sudah penuh");
       if (roster.filter((r: any) => (r.posisi || "Depan") === walkinPosisi).length >= quotaPosisi(jadwal, walkinPosisi)) return alert(`Slot ${walkinPosisi} penuh`);
       const w = walletOf(db, walkinUser);
+      const isGK = walkinPosisi === "GK";
       if (walkinCara === "potong") {
-        if (w.paket + w.reguler < 1) return alert("Kredit pemain 0 — pakai Lunas Cash atau isi kredit dulu");
-        const patch = w.paket > 0 ? { paket: w.paket - 1, reguler: w.reguler } : { paket: w.paket, reguler: w.reguler - 1 };
-        const { error } = await sb().from("wallets").upsert({ user_id: walkinUser, ...patch });
+        const total = w.paket + w.reguler + w.paket_gk + w.reguler_gk;
+        if (total < 1) return alert("Kredit pemain 0 — pakai Lunas Cash atau isi kredit dulu");
+        let patch: any;
+        let pakaiGk = false;
+        if (isGK) {
+          if (w.paket_gk > 0) { patch = { paket_gk: w.paket_gk - 1 }; pakaiGk = true; }
+          else if (w.reguler_gk > 0) { patch = { reguler_gk: w.reguler_gk - 1 }; pakaiGk = true; }
+          else if (w.paket > 0) patch = { paket: w.paket - 1 };
+          else patch = { reguler: w.reguler - 1 };
+        } else {
+          patch = w.paket > 0 ? { paket: w.paket - 1 } : { reguler: w.reguler - 1 };
+        }
+        const { error } = await sb().from("wallets").upsert({ user_id: walkinUser, paket: w.paket, reguler: w.reguler, paket_gk: w.paket_gk, reguler_gk: w.reguler_gk, ...patch });
         if (error) throw new Error(error.message);
-        await adminInsert("rsvps", { schedule_id: jadwal.id, user_id: walkinUser, status: "confirmed_lunas", posisi: walkinPosisi, metode: "deposit" });
+        await adminInsert("rsvps", { schedule_id: jadwal.id, user_id: walkinUser, status: "confirmed_lunas", posisi: walkinPosisi, metode: "deposit", pakai_gk: pakaiGk });
         await adminInsert("txs", { user_id: walkinUser, label: `Walk-in ${jadwal.tanggal} ${walkinPosisi} (potong 1 kredit)`, metode: "potong_deposit", status: "success" });
       } else {
+        const nominal = isGK ? 15000 : 25000;
         await adminInsert("rsvps", { schedule_id: jadwal.id, user_id: walkinUser, status: "confirmed_lunas", posisi: walkinPosisi, metode: "langsung" });
-        await adminInsert("txs", { user_id: walkinUser, label: `Walk-in ${jadwal.tanggal} ${walkinPosisi} (lunas cash 25rb)`, rupiah: 25000, metode: "pelunasan_cash", status: "success" });
+        await adminInsert("txs", { user_id: walkinUser, label: `Walk-in ${jadwal.tanggal} ${walkinPosisi} (lunas cash ${nominal.toLocaleString("id-ID")})`, rupiah: nominal, metode: "pelunasan_cash", status: "success" });
       }
       setWalkinUser("");
     });
@@ -198,11 +227,10 @@ export default function Admin() {
   const exportPemain = () => {
     const rows = db.users.map((u: any) => {
       const w = walletOf(db, u.id);
-      const tung = tunggakanOf(db, u.id).length;
       const main = db.rsvps.filter((r: any) => r.userId === u.id && r.status !== "cancelled").length;
-      return [u.nama, u.wa, u.email || "", u.role, u.status, u.is_member ? "Member" : "Non-member", w.paket, w.reguler, tung > 0 ? 25000 * tung : 0, main];
+      return [u.nama, u.wa, u.email || "", u.role, u.status, u.is_member ? "Member" : "Non-member", w.paket, w.reguler, w.paket_gk, w.reguler_gk, totalTunggakanRp(db, u.id), main];
     });
-    downloadCSV(`pemain-${today()}.csv`, ["Nama", "WA", "Email", "Role", "Status", "Member", "Kredit Paket", "Kredit Reguler", "Tunggakan Rp", "Total Ikut"], rows);
+    downloadCSV(`pemain-${today()}.csv`, ["Nama", "WA", "Email", "Role", "Status", "Member", "Kredit Paket", "Kredit Reguler", "Kredit Paket GK", "Kredit Reguler GK", "Tunggakan Rp", "Total Ikut"], rows);
   };
 
   const jadwal = db.schedules.find((s: any) => s.id === jadwalId) || db.schedules.slice().sort((a: any, b: any) => a.tanggal.localeCompare(b.tanggal))[0];
@@ -279,7 +307,7 @@ export default function Admin() {
         {klaims.length === 0 && <p className="muted">Tidak ada klaim menunggu.</p>}
         {klaims.map((t: any) => (
           <div key={t.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
-            <b>{namaOf(t.userId)}</b> — Paket {t.paket} (Rp{(t.rupiah || 0).toLocaleString("id-ID")}) via <span className="badge gray">{t.metode}</span>
+            <b>{namaOf(t.userId)}</b> — Paket {t.paket}{t.isGk ? " (harga GK 🧤)" : ""} (Rp{(t.rupiah || 0).toLocaleString("id-ID")}) via <span className="badge gray">{t.metode}</span>
             <br /><small className="muted">{t.catatan || ""} {t.bukti ? `• Bukti: ${t.bukti}` : ""} • {String(t.tanggal).slice(0, 16).replace("T", " ")}</small>
             <div className="row" style={{ marginTop: 6 }}>
               <button className="btn small" disabled={busy} onClick={() => verifKlaim(t.id, true)}>Setujui ✅</button>
@@ -345,7 +373,7 @@ export default function Admin() {
               </div>
               <select value={walkinCara} onChange={(e) => setWalkinCara(e.target.value as any)}>
                 <option value="potong">Potong 1 kredit pemain</option>
-                <option value="cash">Lunas cash 25rb di tempat</option>
+                <option value="cash">Lunas cash di tempat (GK 15rb / lainnya 25rb)</option>
               </select>
               <button className="btn" disabled={busy} onClick={tambahWalkin}>Tambah ke List ➜</button>
             </div>
@@ -367,11 +395,14 @@ export default function Admin() {
         <p className="muted"><small>Untuk yang bayar cash di lapangan <b>tanpa klaim</b>, atau kasus khusus. Bantuan privat hanya terlihat di sini.</small></p>
         {db.users.filter((u: any) => u.status === "approved").map((u: any) => (
           <div key={u.id} className="row" style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
-            <div style={{ flex: 1 }}><b>{u.nama}</b> {u.is_member && <span className="badge yellow">⭐ Member</span>}<br /><small className="muted">P{walletOf(db, u.id).paket} / R{walletOf(db, u.id).reguler}</small></div>
+            <div style={{ flex: 1 }}><b>{u.nama}</b> {u.is_member && <span className="badge yellow">⭐ Member</span>}<br /><small className="muted">P{walletOf(db, u.id).paket} / R{walletOf(db, u.id).reguler} / GK {walletOf(db, u.id).paket_gk + walletOf(db, u.id).reguler_gk}</small></div>
             <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "1x")}>+1 cash</button>
             <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "4x")}>+4 cash</button>
+            <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "1x", true)}>+1 GK</button>
+            <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "4x", true)}>+4 GK</button>
             <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler")}>−1 R</button>
             <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "paket")}>−1 P</button>
+            <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler_gk")}>−1 RGK</button>
             <button className="btn secondary small" disabled={busy} onClick={() => toggleMember(u.id)}>{u.is_member ? "Cabut ⭐" : "Jadi ⭐"}</button>
           </div>
         ))}

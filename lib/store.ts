@@ -10,14 +10,14 @@ export type TxStatus = "pending" | "success" | "rejected";
 
 export interface User { id: string; nama: string; wa: string; email: string; role: Role; status: Status; is_member: boolean; }
 export interface Schedule { id: string; tanggal: string; jam: string; lokasi: string; kuota: number; status: ScheduleStatus; }
-export interface Rsvp { id: string; scheduleId: string; userId: string; status: RsvpStatus; posisi: PosisiMain; metode: RsvpMetode; }
+export interface Rsvp { id: string; scheduleId: string; userId: string; status: RsvpStatus; posisi: PosisiMain; metode: RsvpMetode; pakaiGk?: boolean; }
 export interface Tx {
   id: string; userId: string; label: string;
   kreditPaket: number; kreditReguler: number; rupiah: number;
   metode: string; tanggal: string; status: TxStatus;
-  paket?: "1x" | "4x"; bukti?: string; catatan?: string; privateNote?: string;
+  paket?: "1x" | "4x"; bukti?: string; catatan?: string; privateNote?: string; isGk?: boolean;
 }
-export interface Wallet { paket: number; reguler: number; }
+export interface Wallet { paket: number; reguler: number; paket_gk: number; reguler_gk: number; }
 export interface Goal { scorerId: string; }
 export interface Match { id: string; home: string; away: string; sh: number | null; sa: number | null; goals: Goal[]; tanggal?: string; jam?: string; lokasi?: string; }
 export interface TeamMember { userId: string; posisi: "GK" | "Belakang" | "Tengah" | "Depan"; }
@@ -40,9 +40,23 @@ export interface DB {
 }
 
 export function walletOf(db: DB, userId: string): Wallet {
-  return db.wallets[userId] || { paket: 0, reguler: 0 };
+  return db.wallets[userId] || { paket: 0, reguler: 0, paket_gk: 0, reguler_gk: 0 };
 }
-export function totalKredit(w: Wallet) { return w.paket + w.reguler; }
+export function totalKredit(w: Wallet) { return (w.paket || 0) + (w.reguler || 0) + (w.paket_gk || 0) + (w.reguler_gk || 0); }
+export function kreditGK(w: Wallet) { return (w.paket_gk || 0) + (w.reguler_gk || 0); }
+
+/** Harga main per posisi: GK 15rb, lainnya 25rb. Paket: GK 50rb/4x, pemain 90rb/4x. */
+export const HARGA = {
+  sekali: { GK: 15000, pemain: 25000 },
+  paket4: { GK: 50000, pemain: 90000 },
+};
+export function hargaSekali(posisi: string) { return posisi === "GK" ? HARGA.sekali.GK : HARGA.sekali.pemain; }
+export function rpissa(n: number) { return "Rp" + (n || 0).toLocaleString("id-ID"); }
+/** Nominal tunggakan 1 RSVP berdasarkan posisi */
+export function nominalTunggakan(r: { posisi?: string }) { return hargaSekali(r.posisi || ""); }
+export function totalTunggakanRp(db: DB, userId: string) {
+  return tunggakanOf(db, userId).reduce((a, r) => a + nominalTunggakan(r), 0);
+}
 
 export function tunggakanOf(db: DB, userId: string) {
   return db.rsvps.filter((r) => r.userId === userId && (r.status === "confirmed_utang" || r.status === "wajib_bayar"));

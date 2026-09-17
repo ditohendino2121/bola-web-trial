@@ -27,8 +27,8 @@ export default function Home() {
           <h2>Selamat datang! 👋</h2>
           <p className="muted">Daftar sekali, tunggu approve admin, langsung bisa isi list main.</p>
           <div className="pricegrid">
-            <div className="price"><span className="muted">Sekali main</span><br /><b>Rp25rb</b><br /><small className="muted">= 1 kredit</small></div>
-            <div className="price hot sel"><span className="tag">JADI MEMBER ⭐</span><span className="muted">Paket 4x main</span><br /><b>Rp90rb</b><br /><small className="muted">= 4 kredit + member permanen</small></div>
+            <div className="price"><span className="muted">Sekali main</span><br /><b>Rp25rb</b><br /><small className="muted">= 1 kredit • GK Rp15rb</small></div>
+            <div className="price hot sel"><span className="tag">JADI MEMBER ⭐</span><span className="muted">Paket 4x main</span><br /><b>Rp90rb</b><br /><small className="muted">= 4 kredit + member permanen • GK Rp50rb</small></div>
           </div>
           <AuthBox onDone={reload} />
         </div>
@@ -37,7 +37,7 @@ export default function Home() {
           <div className="saldo">
             <small>Halo, {me.nama}! • {me.role} • {me.status} {me.is_member ? "• ⭐ Member" : ""}</small>
             <div className="num">{totalKredit(walletOf(db, me.id))} kredit</div>
-            <small>Paket {walletOf(db, me.id).paket} • Reguler {walletOf(db, me.id).reguler}</small>
+            <small>Paket {walletOf(db, me.id).paket} • Reguler {walletOf(db, me.id).reguler} • GK {walletOf(db, me.id).paket_gk + walletOf(db, me.id).reguler_gk}</small>
             <div className="row" style={{ marginTop: 12 }}>
               <Link href="/topup" style={{ flex: 1 }}><button className="btn warn" style={{ background: "#D4AF37", color: "#141005" }}>💳 Top-Up</button></Link>
               <Link href="/jadwal" style={{ flex: 1 }}><button className="btn" style={{ background: "#141005", border: "1px solid var(--gold-deep)" }}>📅 Isi List</button></Link>

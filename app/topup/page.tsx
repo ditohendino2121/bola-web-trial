@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { walletOf, totalKredit } from "../../lib/store";
+import { walletOf, totalKredit, HARGA } from "../../lib/store";
 import { fetchAll, kirimKlaim } from "../../lib/db";
 
 export default function Topup() {
@@ -8,6 +8,7 @@ export default function Topup() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [paket, setPaket] = useState<"1x" | "4x">("4x");
+  const [isGK, setIsGK] = useState(false);
   const [metode, setMetode] = useState("qris");
   const [bukti, setBukti] = useState("");
   const [catatan, setCatatan] = useState("");
@@ -18,7 +19,9 @@ export default function Topup() {
   const me = db.users.find((u: any) => u.id === db.sessionId);
   if (!me) return <div className="card"><h3>Login dulu yuk 🔐</h3></div>;
 
-  const harga = paket === "1x" ? 25000 : 90000;
+  const harga = paket === "1x"
+    ? (isGK ? HARGA.sekali.GK : HARGA.sekali.pemain)
+    : (isGK ? HARGA.paket4.GK : HARGA.paket4.pemain);
   const klaimAktif = db.txs.find((t: any) => t.userId === me.id && t.status === "pending");
 
   const kirim = async () => {
@@ -26,7 +29,7 @@ export default function Topup() {
     if ((metode === "qris" || metode === "transfer") && !bukti && !confirm("Belum isi info bukti. Tetap kirim?")) return;
     setBusy(true);
     try {
-      await kirimKlaim(me.id, paket, metode, harga, bukti, catatan);
+      await kirimKlaim(me.id, paket, metode, harga, bukti, catatan, isGK);
       setBukti(""); setCatatan("");
       await reload();
       alert("✅ Konfirmasi terkirim! Tunggu admin cek & approve. Kredit masuk setelah disetujui.");
@@ -41,19 +44,24 @@ export default function Topup() {
       <div className="saldo">
         <small>Saldomu sekarang {me.is_member ? "⭐ Member" : ""}</small>
         <div className="num">{totalKredit(walletOf(db, me.id))} kredit</div>
-        <small>Paket {walletOf(db, me.id).paket} • Reguler {walletOf(db, me.id).reguler} • 1 kredit = 1x main</small>
+        <small>Paket {walletOf(db, me.id).paket} • Reguler {walletOf(db, me.id).reguler} • GK {walletOf(db, me.id).paket_gk + walletOf(db, me.id).reguler_gk} • 1 kredit = 1x main</small>
       </div>
 
       {klaimAktif && <div className="banner warn">⏳ Klaim {klaimAktif.paket} via {klaimAktif.metode} sedang dicek admin. Kredit masuk setelah disetujui.</div>}
 
       <div className="card">
         <h3>💳 Top-up (bayar manual)</h3>
+        <label><small className="muted"><b>Saya top-up sebagai</b></small></label>
+        <select value={isGK ? "gk" : "pemain"} onChange={(e) => setIsGK(e.target.value === "gk")}>
+          <option value="pemain">🧍 Pemain — 25rb / paket 90rb</option>
+          <option value="gk">🧤 Kiper (GK) — 15rb / paket 50rb</option>
+        </select>
         <div className="pricegrid">
           <div className={`price ${paket === "1x" ? "sel" : ""}`} onClick={() => setPaket("1x")}>
-            <span className="muted">Sekali main</span><br /><b>Rp25rb</b><br /><small className="muted">dapat 1 kredit</small>
+            <span className="muted">Sekali main</span><br /><b>{isGK ? "Rp15rb" : "Rp25rb"}</b><br /><small className="muted">dapat 1 kredit{isGK ? " GK" : ""}</small>
           </div>
           <div className={`price hot ${paket === "4x" ? "sel" : ""}`} onClick={() => setPaket("4x")}>
-            <span className="tag">JADI MEMBER ⭐</span><span className="muted">Paket 4x main</span><br /><b>Rp90rb</b><br /><small className="muted">dapat 4 kredit + status member permanen</small>
+            <span className="tag">JADI MEMBER ⭐</span><span className="muted">Paket 4x main</span><br /><b>{isGK ? "Rp50rb" : "Rp90rb"}</b><br /><small className="muted">dapat 4 kredit{isGK ? " GK" : ""} + status member permanen</small>
           </div>
         </div>
         <label><small className="muted"><b>Cara bayar</b></small></label>

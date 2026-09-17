@@ -94,8 +94,8 @@ export default function Jadwal() {
                         return <option key={p} value={p} disabled={isi >= q}>{p} — sisa {Math.max(0, q - isi)}{isi >= q ? " (PENUH)" : ""}</option>;
                       })}
                     </select>
-                    <button className="btn" disabled={busy} onClick={() => ikut(s, "deposit")}>✅ {pos} — Potong 1 Kredit</button>
-                    <button className="btn secondary" disabled={busy} onClick={() => ikut(s, "langsung")}>💵 {pos} — Bayar Cash di Tempat</button>
+                    <button className="btn" disabled={busy} onClick={() => ikut(s, "deposit")}>✅ {pos} — Potong 1 Kredit{pos === "GK" ? " (GK dulu)" : ""}</button>
+                    <button className="btn secondary" disabled={busy} onClick={() => ikut(s, "langsung")}>💵 {pos} — Bayar Cash di Tempat ({pos === "GK" ? "15rb" : "25rb"})</button>
                   </>
                 )
               ) : (

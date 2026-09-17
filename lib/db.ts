@@ -14,13 +14,13 @@ const mapSchedule = (s: any) => ({
 });
 const mapRsvp = (r: any) => ({
   id: r.id, scheduleId: r.schedule_id, userId: r.user_id,
-  status: r.status, posisi: r.posisi, metode: r.metode,
+  status: r.status, posisi: r.posisi, metode: r.metode, pakaiGk: !!r.pakai_gk,
 });
 const mapTx = (t: any) => ({
   id: t.id, userId: t.user_id, label: t.label,
   kreditPaket: t.kredit_paket, kreditReguler: t.kredit_reguler, rupiah: t.rupiah,
   metode: t.metode, tanggal: t.tanggal, status: t.status,
-  paket: t.paket, bukti: t.bukti, catatan: t.catatan, privateNote: t.private_note,
+  paket: t.paket, bukti: t.bukti, catatan: t.catatan, privateNote: t.private_note, isGk: !!t.is_gk,
 });
 
 export async function sessionId(): Promise<string | null> {
@@ -49,7 +49,7 @@ export async function fetchAll(): Promise<DB> {
   if (err?.error) throw new Error("Gagal ambil data: " + err.error.message);
 
   const wrec: DB["wallets"] = {};
-  (wallets.data || []).forEach((w: any) => { wrec[w.user_id] = { paket: w.paket, reguler: w.reguler }; });
+  (wallets.data || []).forEach((w: any) => { wrec[w.user_id] = { paket: w.paket || 0, reguler: w.reguler || 0, paket_gk: w.paket_gk || 0, reguler_gk: w.reguler_gk || 0 }; });
   const teams: DB["teams"] = { A: [], B: [], C: [], D: [] };
   (members.data || []).forEach((m: any) => { (teams[m.team] = teams[m.team] || []).push({ userId: m.user_id, posisi: m.posisi }); });
 
@@ -120,11 +120,11 @@ export async function batalRsvp(scheduleId: string) {
 }
 
 // ---------- klaim top-up ----------
-export async function kirimKlaim(userId: string, paket: "1x" | "4x", metode: string, rupiah: number, bukti: string, catatan: string) {
+export async function kirimKlaim(userId: string, paket: "1x" | "4x", metode: string, rupiah: number, bukti: string, catatan: string, isGK = false) {
   const { error } = await supa().from("txs").insert({
     user_id: userId,
-    label: `Klaim top-up ${paket} via ${metode} (Rp${rupiah.toLocaleString("id-ID")})`,
-    rupiah, metode: `klaim_${metode}`, status: "pending", paket, bukti, catatan,
+    label: `Klaim top-up ${paket}${isGK ? " (harga GK)" : ""} via ${metode} (Rp${rupiah.toLocaleString("id-ID")})`,
+    rupiah, metode: `klaim_${metode}`, status: "pending", paket, bukti, catatan, is_gk: isGK,
   });
   if (error) throw new Error(error.message);
 }

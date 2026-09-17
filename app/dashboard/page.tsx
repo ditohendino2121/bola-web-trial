@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { walletOf, totalKredit, tunggakanOf, langsungBelumLunas } from "../../lib/store";
+import { walletOf, totalKredit, tunggakanOf, langsungBelumLunas, totalTunggakanRp } from "../../lib/store";
 import { fetchAll, signOut } from "../../lib/db";
 
 export default function Dashboard() {
@@ -22,14 +22,14 @@ export default function Dashboard() {
       <div className="saldo">
         <small>👤 {me.nama} {me.is_member ? "⭐ Member" : "• Non-member"} • {me.status}</small>
         <div className="num">{totalKredit(walletOf(db, me.id))} kredit</div>
-        <small>Paket {walletOf(db, me.id).paket} • Reguler {walletOf(db, me.id).reguler}</small>
+        <small>Paket {walletOf(db, me.id).paket} • Reguler {walletOf(db, me.id).reguler} • GK {walletOf(db, me.id).paket_gk + walletOf(db, me.id).reguler_gk}</small>
         {!me.is_member && <div style={{ marginTop: 8 }}><small>💡 Beli paket 90rb untuk jadi <b>member permanen</b> + bisa ikut liga!</small></div>}
         <div className="row" style={{ marginTop: 12 }}>
           <Link href="/topup" style={{ flex: 1 }}><button className="btn warn" style={{ background: "#D4AF37", color: "#141005" }}>💳 Top-Up</button></Link>
           <Link href="/jadwal" style={{ flex: 1 }}><button className="btn" style={{ background: "#141005", border: "1px solid var(--gold-deep)" }}>📅 Jadwal</button></Link>
         </div>
       </div>
-      {tung.length > 0 && <div className="banner err">🔒 Punya tunggakan {tung.length}x (Rp{(25000 * tung.length).toLocaleString("id-ID")}). Lunasi ke admin dulu untuk buka list berikutnya.</div>}
+      {tung.length > 0 && <div className="banner err">🔒 Punya tunggakan {tung.length}x (Rp{totalTunggakanRp(db, me.id).toLocaleString("id-ID")}). Lunasi ke admin dulu untuk buka list berikutnya.</div>}
       {tung.length === 0 && nLangsung > 0 && <div className="banner warn">💵 Ada {nLangsung}x bayar-di-tempat yang belum dikonfirmasi lunas admin. List berikutnya terkunci sampai lunas.</div>}
       {klaim && <div className="banner warn">⏳ Klaim top-up {klaim.paket} sedang dicek admin.</div>}
       {me.status === "pending" && <div className="banner warn">⏳ Menunggu approve admin.</div>}

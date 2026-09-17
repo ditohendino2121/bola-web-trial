@@ -37,8 +37,8 @@ begin
     coalesce(new.raw_user_meta_data->>'wa', '')
   )
   on conflict (id) do nothing;
-  insert into public.wallets (user_id, paket, reguler)
-  values (new.id, 0, 0)
+  insert into public.wallets (user_id, paket, reguler, paket_gk, reguler_gk)
+  values (new.id, 0, 0, 0, 0)
   on conflict (user_id) do nothing;
   return new;
 end;
@@ -48,11 +48,13 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- ---------- 2. wallets ----------
+-- ---------- 2. wallets (bucket normal + khusus GK) ----------
 create table if not exists public.wallets (
   user_id uuid primary key references public.profiles(id) on delete cascade,
   paket int not null default 0 check (paket >= 0),
-  reguler int not null default 0 check (reguler >= 0)
+  reguler int not null default 0 check (reguler >= 0),
+  paket_gk int not null default 0 check (paket_gk >= 0),
+  reguler_gk int not null default 0 check (reguler_gk >= 0)
 );
 
 -- ---------- 3. schedules ----------
@@ -76,6 +78,7 @@ create table if not exists public.rsvps (
     check (status in ('confirmed_lunas','confirmed_utang','confirmed_langsung','wajib_bayar','cancelled','no_show')),
   posisi text not null default 'Depan' check (posisi in ('GK','Belakang','Tengah','Depan')),
   metode text not null default 'langsung' check (metode in ('deposit','utang','langsung')),
+  pakai_gk boolean not null default false,
   created_at timestamptz not null default now()
 );
 create index if not exists idx_rsvps_schedule on public.rsvps (schedule_id);
@@ -98,7 +101,8 @@ create table if not exists public.txs (
   paket text check (paket in ('1x','4x')),
   bukti text default '',
   catatan text default '',
-  private_note text default ''
+  private_note text default '',
+  is_gk boolean not null default false
 );
 create index if not exists idx_txs_user on public.txs (user_id);
 create index if not exists idx_txs_tanggal on public.txs (tanggal);
@@ -263,6 +267,7 @@ declare
   v_isipos int;
   v_w record;
   v_rid uuid;
+  v_pakai_gk boolean := false;
 begin
   if v_uid is null then return jsonb_build_object('ok', false, 'msg', 'Belum login'); end if;
   select * into v_prof from public.profiles where id = v_uid;
@@ -290,12 +295,25 @@ begin
   --  tapi UI tidak lagi menawarkannya.)
   if p_metode = 'deposit' then
     select * into v_w from public.wallets where user_id = v_uid for update;
-    if coalesce(v_w.paket,0) + coalesce(v_w.reguler,0) < 1
-      then return jsonb_build_object('ok', false, 'msg', 'Kredit habis'); end if;
-    if coalesce(v_w.paket,0) > 0 then update public.wallets set paket = paket - 1 where user_id = v_uid;
-    else update public.wallets set reguler = reguler - 1 where user_id = v_uid; end if;
-    insert into public.rsvps (schedule_id, user_id, status, posisi, metode)
-      values (p_schedule, v_uid, 'confirmed_lunas', p_posisi, 'deposit') returning id into v_rid;
+    -- GK pakai kredit GK dulu (paket_gk -> reguler_gk), baru kredit normal.
+    -- Non-GK HANYA boleh pakai kredit normal (kredit GK terkunci).
+    if p_posisi = 'GK' then
+      if coalesce(v_w.paket_gk,0) > 0 then
+        update public.wallets set paket_gk = paket_gk - 1 where user_id = v_uid; v_pakai_gk := true;
+      elsif coalesce(v_w.reguler_gk,0) > 0 then
+        update public.wallets set reguler_gk = reguler_gk - 1 where user_id = v_uid; v_pakai_gk := true;
+      elsif coalesce(v_w.paket,0) > 0 then
+        update public.wallets set paket = paket - 1 where user_id = v_uid;
+      elsif coalesce(v_w.reguler,0) > 0 then
+        update public.wallets set reguler = reguler - 1 where user_id = v_uid;
+      else return jsonb_build_object('ok', false, 'msg', 'Kredit habis'); end if;
+    else
+      if coalesce(v_w.paket,0) > 0 then update public.wallets set paket = paket - 1 where user_id = v_uid;
+      elsif coalesce(v_w.reguler,0) > 0 then update public.wallets set reguler = reguler - 1 where user_id = v_uid;
+      else return jsonb_build_object('ok', false, 'msg', 'Kredit habis'); end if;
+    end if;
+    insert into public.rsvps (schedule_id, user_id, status, posisi, metode, pakai_gk)
+      values (p_schedule, v_uid, 'confirmed_lunas', p_posisi, 'deposit', coalesce(v_pakai_gk, false)) returning id into v_rid;
     insert into public.txs (user_id, label, metode, status)
       values (v_uid, 'Main ' || v_sch.tanggal || ' ' || p_posisi || ' (potong 1 kredit)', 'potong_deposit', 'success');
   elsif p_metode = 'utang' then
@@ -331,7 +349,11 @@ begin
   v_kickoff := (v_sch.tanggal::text || ' ' || substring(v_sch.jam from '(\d{1,2}:\d{2})'))::timestamptz;
   if now() > v_kickoff - interval '2 days' then return jsonb_build_object('ok', false, 'msg', 'Sudah lewat H-2 — tetap wajib bayar'); end if;
   if v_r.status = 'confirmed_lunas' and v_r.metode = 'deposit' then
-    update public.wallets set reguler = reguler + 1 where user_id = v_uid;
+    if coalesce(v_r.pakai_gk, false) then
+      update public.wallets set reguler_gk = reguler_gk + 1 where user_id = v_uid;
+    else
+      update public.wallets set reguler = reguler + 1 where user_id = v_uid;
+    end if;
   end if;
   update public.rsvps set status = 'cancelled' where id = v_r.id;
   return jsonb_build_object('ok', true);

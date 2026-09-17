@@ -121,7 +121,7 @@
 <h3>Tiga tombol check-in per nama</h3>
 <table>
   <tr><th>Tombol</th><th>Kapan dipakai</th><th>Efek</th></tr>
-  <tr><td><b>Lunas ✅</b></td><td>Pemain bayar cash 25rb di tempat (untuk bayar-di-tempat)</td><td>Status jadi Lunas + Rp25rb masuk kas</td></tr>
+  <tr><td><b>Lunas ✅</b></td><td>Pemain bayar cash di tempat: 25rb (GK 15rb)</td><td>Status jadi Lunas + nominal masuk kas</td></tr>
   <tr><td><b>Belum bayar</b></td><td>Datang tapi belum bayar</td><td>Jadi <b>tunggakan</b> → dikunci tidak bisa ikut game berikutnya</td></tr>
   <tr><td><b>Tidak datang</b></td><td>Mangkir</td><td>Deposit hangus (jika potong deposit). Jika bayar-di-tempat → jadi tunggakan</td></tr>
 </table>
@@ -131,7 +131,7 @@
 <h2 class="ch" id="c6">6. Walk-in: Pemain Datang Tanpa Isi List</h2>
 <ol class="steps">
   <li>Di Roster per tanggal, buka kartu <b>🚶 Walk-in H-day</b>.</li>
-  <li>Pilih pemain (yang sudah di list tidak muncul), posisi, dan cara: <b>Potong 1 kredit</b> atau <b>Lunas cash 25rb</b>.</li>
+  <li>Pilih pemain (yang sudah di list tidak muncul), posisi, dan cara: <b>Potong 1 kredit</b> atau <b>Lunas cash</b> (25rb, GK 15rb).</li>
   <li>Klik <b>Tambah ke List</b>. Kuota dan slot posisi dicek otomatis.</li>
 </ol>
 
@@ -140,10 +140,10 @@
 <ol class="steps">
   <li>Pemain bayar ke QRIS/rekening komunitas lalu kirim konfirmasi dari menu Top-Up.</li>
   <li>Di <b>Admin → 💳 Verifikasi pembayaran</b> muncul antrian: nama, paket, metode, info bukti.</li>
-  <li>Cek mutasi/rekening. Cocok? <b>Setujui ✅</b> → kredit masuk (paket 4x otomatis menjadikan pemain <b>⭐ Member</b>). Tidak cocok? <b>Tolak</b> + isi alasan (terlihat pemain).</li>
+  <li>Cek mutasi/rekening. Cocok? <b>Setujui ✅</b> → kredit masuk ke bucket yang sesuai (paket 4x — normal maupun GK — otomatis menjadikan pemain <b>⭐ Member</b>). Tidak cocok? <b>Tolak</b> + isi alasan (terlihat pemain).</li>
 </ol>
 <h3>Top-up cash tanpa klaim</h3>
-<p>Di kartu <b>➕ Kredit manual</b>: tiap pemain ada tombol <b>+1 cash</b> dan <b>+4 cash</b>. Untuk yang bayar tunai di lapangan tanpa sempat klaim. Tercatat di kas sebagai <code>manual_cash</code>.</p>
+<p>Di kartu <b>➕ Kredit manual</b>: tiap pemain ada tombol <b>+1 cash</b> / <b>+4 cash</b> (harga normal) dan <b>+1 GK</b> / <b>+4 GK</b> (15rb / 50rb, masuk bucket kredit GK). Untuk yang bayar tunai di lapangan tanpa sempat klaim. Klaim pemain yang disetujui juga otomatis masuk bucket yang sesuai (klaim harga GK bertanda 🧤). Kredit GK <b>hanya bisa dipakai saat main sebagai GK</b> — sistem menolak pemakaian silang.</p>
 <h3>Kredit bantuan (privat) 🎗️</h3>
 <div class="box"><b class="t">🔒 Rahasia admin</b>Untuk pemain yang tidak mampu bayar (hanya admin yang tahu). Pemain hanya melihat label netral <b>“Kredit admin”</b> — tanpa kata gratis/bantuan. Alasan asli hanya terlihat di panel admin dan tidak dihitung sebagai pemasukan kas.</div>
 
@@ -158,7 +158,7 @@
 <h2 class="ch" id="c9">9. Member vs Non-Member</h2>
 <table>
   <tr><th></th><th>Member ⭐</th><th>Non-member</th></tr>
-  <tr><td>Cara jadi</td><td>Beli paket 90rb (disetujui) — <b>permanen</b></td><td>—</td></tr>
+  <tr><td>Cara jadi</td><td>Beli paket 4x (90rb / GK 50rb, disetujui) — <b>permanen</b></td><td>—</td></tr>
   <tr><td>RSVP mingguan</td><td>✅</td><td>✅</td></tr>
   <tr><td>Daftar liga 6 bulan</td><td>✅</td><td>❌ (muncul ajakan jadi member)</td></tr>
 </table>
@@ -169,7 +169,7 @@
 <table>
   <tr><th>Kapan tarik list</th><th>Potong deposit</th><th>Bayar di tempat</th></tr>
   <tr><td>≥ H-2</td><td>✅ Kredit kembali</td><td>✅ List dibatalkan, tidak ditagih</td></tr>
-  <tr><td>&lt; H-2 / tidak datang</td><td>❌ Hangus</td><td>❌ Tetap ditagih 25rb → kunci list berikutnya</td></tr>
+  <tr><td>&lt; H-2 / tidak datang</td><td>❌ Hangus</td><td>❌ Tetap ditagih (25rb, GK 15rb) → kunci list berikutnya</td></tr>
 </table>
 <p>Tombol “Tarik List” mati otomatis setelah H-2. Pengecualian darurat hanya via admin (batal paksa/void + alasan).</p>
 

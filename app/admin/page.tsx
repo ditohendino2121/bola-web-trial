@@ -20,6 +20,8 @@ export default function Admin() {
   const [walkinUser, setWalkinUser] = useState("");
   const [walkinPosisi, setWalkinPosisi] = useState<"GK" | "Belakang" | "Tengah" | "Depan">("Depan");
   const [walkinCara, setWalkinCara] = useState<"potong" | "cash">("potong");
+  const [manualText, setManualText] = useState("");
+  const manualLabel = (u: any) => `${u.nama} (${u.wa})`;
   const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
   useEffect(() => { reload(); }, []);
   if (err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
@@ -392,20 +394,44 @@ export default function Admin() {
 
       <div className="card">
         <h3>➕ Kredit manual (cash / bantuan / koreksi)</h3>
-        <p className="muted"><small>Untuk yang bayar cash di lapangan <b>tanpa klaim</b>, atau kasus khusus. Bantuan privat hanya terlihat di sini.</small></p>
-        {db.users.filter((u: any) => u.status === "approved").map((u: any) => (
-          <div key={u.id} className="row" style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
-            <div style={{ flex: 1 }}><b>{u.nama}</b> {u.is_member && <span className="badge yellow">⭐ Member</span>}<br /><small className="muted">P{walletOf(db, u.id).paket} / R{walletOf(db, u.id).reguler} / GK {walletOf(db, u.id).paket_gk + walletOf(db, u.id).reguler_gk}</small></div>
-            <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "1x")}>+1 cash</button>
-            <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "4x")}>+4 cash</button>
-            <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "1x", true)}>+1 GK</button>
-            <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "4x", true)}>+4 GK</button>
-            <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler")}>−1 R</button>
-            <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "paket")}>−1 P</button>
-            <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler_gk")}>−1 RGK</button>
-            <button className="btn secondary small" disabled={busy} onClick={() => toggleMember(u.id)}>{u.is_member ? "Cabut ⭐" : "Jadi ⭐"}</button>
-          </div>
-        ))}
+        <p className="muted"><small>Pilih pemain dulu (ketik untuk cari), baru tombol aksi muncul. Untuk cash tanpa klaim / koreksi / ⭐.</small></p>
+        <input
+          list="manual-pemain-list"
+          placeholder="🔍 Ketik nama atau pilih dari daftar..."
+          value={manualText}
+          onChange={(e) => setManualText(e.target.value)}
+        />
+        <datalist id="manual-pemain-list">
+          {db.users.filter((u: any) => u.status === "approved").map((u: any) => (
+            <option key={u.id} value={manualLabel(u)} />
+          ))}
+        </datalist>
+        {(() => {
+          const u = db.users.find((x: any) => x.status === "approved" && (manualLabel(x) === manualText || x.nama === manualText));
+          if (!u) return <p className="muted"><small>{manualText ? "Nama tidak cocok — pilih dari daftar." : "Belum ada pemain dipilih."}</small></p>;
+          const w = walletOf(db, u.id);
+          return (
+            <div className="card" style={{ background: "#211a08", borderColor: "var(--gold-deep)" }}>
+              <div className="section-title">
+                <div><b style={{ fontSize: 18 }}>{u.nama}</b> {u.is_member && <span className="badge yellow">⭐ Member</span>}<br />
+                <small className="muted">{u.wa} • P{w.paket} / R{w.reguler} / GK {w.paket_gk + w.reguler_gk}</small></div>
+                <button className="btn secondary small" onClick={() => setManualText("")}>✖ Ganti</button>
+              </div>
+              <div className="row" style={{ marginTop: 8 }}>
+                <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "1x")}>+1 cash</button>
+                <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "4x")}>+4 cash</button>
+                <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "1x", true)}>+1 GK</button>
+                <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "4x", true)}>+4 GK</button>
+              </div>
+              <div className="row" style={{ marginTop: 6 }}>
+                <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler")}>−1 R</button>
+                <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "paket")}>−1 P</button>
+                <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler_gk")}>−1 RGK</button>
+                <button className="btn secondary small" disabled={busy} onClick={() => toggleMember(u.id)}>{u.is_member ? "Cabut ⭐" : "Jadi ⭐"}</button>
+              </div>
+            </div>
+          );
+        })()}
         <h4 style={{ marginTop: 12 }}>🎗️ Kredit bantuan (privat)</h4>
         <div className="grid2">
           <select value={bantuanUser} onChange={(e) => setBantuanUser(e.target.value)}>

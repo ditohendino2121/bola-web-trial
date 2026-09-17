@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { walletOf, totalKredit, tunggakanOf } from "../../lib/store";
+import { walletOf, totalKredit, tunggakanOf, langsungBelumLunas } from "../../lib/store";
 import { fetchAll, signOut } from "../../lib/db";
 
 export default function Dashboard() {
@@ -15,6 +15,7 @@ export default function Dashboard() {
   if (!me) return <div className="card"><h3>Login dulu yuk 🔐</h3><p><Link href="/">Ke Beranda</Link></p></div>;
   const mine = db.rsvps.filter((r: any) => r.userId === me.id && r.status !== "cancelled");
   const tung = tunggakanOf(db, me.id);
+  const nLangsung = langsungBelumLunas(db, me.id).length;
   const klaim = db.txs.find((t: any) => t.userId === me.id && t.status === "pending");
   return (
     <div>
@@ -29,6 +30,7 @@ export default function Dashboard() {
         </div>
       </div>
       {tung.length > 0 && <div className="banner err">🔒 Punya tunggakan {tung.length}x (Rp{(25000 * tung.length).toLocaleString("id-ID")}). Lunasi ke admin dulu untuk buka list berikutnya.</div>}
+      {tung.length === 0 && nLangsung > 0 && <div className="banner warn">💵 Ada {nLangsung}x bayar-di-tempat yang belum dikonfirmasi lunas admin. List berikutnya terkunci sampai lunas.</div>}
       {klaim && <div className="banner warn">⏳ Klaim top-up {klaim.paket} sedang dicek admin.</div>}
       {me.status === "pending" && <div className="banner warn">⏳ Menunggu approve admin.</div>}
       <div className="card">

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { walletOf, totalKredit, hasUtang } from "../lib/store";
+import { walletOf, totalKredit, dikunciRSVP } from "../lib/store";
 import { fetchAll, signUp, signIn, signOut } from "../lib/db";
 import { BASECAMP } from "../lib/club";
 
@@ -46,8 +46,8 @@ export default function Home() {
           {me.status === "pending" && (
             <div className="banner warn">⏳ Akunmu menunggu approve admin. Hubungi pengurus di menu Kontak.</div>
           )}
-          {hasUtang(db, me.id) && (
-            <div className="banner err">⚠️ Kamu ada tunggakan — lunasi ke admin dulu untuk buka list berikutnya.</div>
+          {dikunciRSVP(db, me.id) && (
+            <div className="banner err">⚠️ Ada pembayaran yang belum beres (tunggakan / bayar-di-tempat belum lunas) — lunasi ke admin dulu.</div>
           )}
           <div className="row">
             <button className="btn secondary small" onClick={() => signOut().then(reload)}>Logout</button>

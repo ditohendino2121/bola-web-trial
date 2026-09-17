@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  hasUtang, QUOTA_MAIN, POSISI_MAIN, kuotaAktif, quotaPosisi,
+  dikunciRSVP, langsungBelumLunas, QUOTA_MAIN, POSISI_MAIN, kuotaAktif, quotaPosisi,
   lewatH2, fmtBatas, STATUS_LABEL,
   type PosisiMain, type RsvpMetode,
 } from "../../lib/store";
@@ -38,13 +38,14 @@ export default function Jadwal() {
     setBusy(false);
   };
 
-  const terkunci = hasUtang(db, me.id);
+  const terkunci = dikunciRSVP(db, me.id);
+  const nLangsung = langsungBelumLunas(db, me.id).length;
 
   return (
     <div>
       <h2 style={{ margin: "4px 0" }}>📅 Mau ikut yang mana?</h2>
-      <p className="muted">Pilih posisi dulu, lalu ikut. Kuota per game 28 orang: GK 4 • Belakang 8 • Tengah 8 • Depan 8.</p>
-      {terkunci && <div className="banner err">🔒 Kamu punya tunggakan. Lunasi ke admin dulu untuk buka list berikutnya.</div>}
+      <p className="muted">Pilih posisi dulu, lalu ikut — potong kredit atau bayar cash di tempat. Kuota 28: GK 4 • Belakang/Tengah/Depan @8.</p>
+      {terkunci && <div className="banner err">🔒 {nLangsung > 0 ? `Kamu ada ${nLangsung}x bayar-di-tempat yang belum dikonfirmasi lunas admin. Selesaikan dulu untuk buka list berikutnya.` : "Kamu punya tunggakan. Lunasi ke admin dulu untuk buka list berikutnya."}</div>}
       {db.schedules.slice().sort((a: any, b: any) => a.tanggal.localeCompare(b.tanggal)).map((s: any) => {
         const list = db.rsvps.filter((r: any) => r.scheduleId === s.id && r.status !== "cancelled");
         const mine = list.find((r: any) => r.userId === me.id);
@@ -94,7 +95,6 @@ export default function Jadwal() {
                       })}
                     </select>
                     <button className="btn" disabled={busy} onClick={() => ikut(s, "deposit")}>✅ {pos} — Potong 1 Kredit</button>
-                    <button className="btn secondary" disabled={busy} onClick={() => ikut(s, "utang")}>📝 {pos} — Utang Dulu (25K)</button>
                     <button className="btn secondary" disabled={busy} onClick={() => ikut(s, "langsung")}>💵 {pos} — Bayar Cash di Tempat</button>
                   </>
                 )

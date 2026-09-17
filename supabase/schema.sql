@@ -271,8 +271,8 @@ begin
   if v_sch.status in ('tutup','full_booked') then return jsonb_build_object('ok', false, 'msg', 'Jadwal tutup/full booked'); end if;
   if exists (select 1 from public.rsvps where schedule_id = p_schedule and user_id = v_uid and status <> 'cancelled')
     then return jsonb_build_object('ok', false, 'msg', 'Sudah isi list jadwal ini'); end if;
-  if exists (select 1 from public.rsvps where user_id = v_uid and status in ('confirmed_utang','wajib_bayar'))
-    then return jsonb_build_object('ok', false, 'msg', 'Masih ada tunggakan — lunasi dulu'); end if;
+  if exists (select 1 from public.rsvps where user_id = v_uid and status in ('confirmed_utang','wajib_bayar','confirmed_langsung'))
+    then return jsonb_build_object('ok', false, 'msg', 'Masih ada pembayaran belum beres — lunasi dulu'); end if;
 
   v_kuota := case when v_sch.status = 'sparing' then 14 else coalesce(v_sch.kuota, 28) end;
   select count(*) into v_isi from public.rsvps where schedule_id = p_schedule and status <> 'cancelled';
@@ -285,6 +285,9 @@ begin
     where schedule_id = p_schedule and posisi = p_posisi and status <> 'cancelled';
   if v_isipos >= v_qpos then return jsonb_build_object('ok', false, 'msg', 'Slot ' || p_posisi || ' penuh'); end if;
 
+  -- Cara ikut hanya 2: potong deposit ATAU bayar cash di tempat.
+  -- (Cabang 'utang' lama dipertahankan untuk kompatibilitas data lama,
+  --  tapi UI tidak lagi menawarkannya.)
   if p_metode = 'deposit' then
     select * into v_w from public.wallets where user_id = v_uid for update;
     if coalesce(v_w.paket,0) + coalesce(v_w.reguler,0) < 1

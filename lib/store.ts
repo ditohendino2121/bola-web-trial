@@ -48,6 +48,15 @@ export function tunggakanOf(db: DB, userId: string) {
   return db.rsvps.filter((r) => r.userId === userId && (r.status === "confirmed_utang" || r.status === "wajib_bayar"));
 }
 export function hasUtang(db: DB, userId: string) { return tunggakanOf(db, userId).length > 0; }
+
+/** Bayar-di-tempat yang belum dikonfirmasi lunas oleh admin */
+export function langsungBelumLunas(db: DB, userId: string) {
+  return db.rsvps.filter((r) => r.userId === userId && r.status === "confirmed_langsung");
+}
+/** Kunci RSVP baru: ada tunggakan ATAU ada bayar-di-tempat belum lunas */
+export function dikunciRSVP(db: DB, userId: string) {
+  return hasUtang(db, userId) || langsungBelumLunas(db, userId).length > 0;
+}
 export function uid() { return "u_" + Math.random().toString(36).slice(2, 9); }
 
 export function kickoff(s: Schedule): Date {

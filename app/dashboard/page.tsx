@@ -1,11 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { load, walletOf, totalKredit, tunggakanOf } from "../../lib/store";
+import { walletOf, totalKredit, tunggakanOf } from "../../lib/store";
+import { fetchAll, signOut } from "../../lib/db";
 
 export default function Dashboard() {
   const [db, setDb] = useState<any>(null);
-  useEffect(() => { setDb(load()); }, []);
+  const [err, setErr] = useState("");
+  const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
+  useEffect(() => { reload(); }, []);
+  if (err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
   if (!db) return <div className="card"><p>Memuat...</p></div>;
   const me = db.users.find((u: any) => u.id === db.sessionId);
   if (!me) return <div className="card"><h3>Login dulu yuk 🔐</h3><p><Link href="/">Ke Beranda</Link></p></div>;
@@ -20,8 +24,8 @@ export default function Dashboard() {
         <small>Paket {walletOf(db, me.id).paket} • Reguler {walletOf(db, me.id).reguler}</small>
         {!me.is_member && <div style={{ marginTop: 8 }}><small>💡 Beli paket 90rb untuk jadi <b>member permanen</b> + bisa ikut liga!</small></div>}
         <div className="row" style={{ marginTop: 12 }}>
-          <Link href="/topup" style={{ flex: 1 }}><button className="btn warn" style={{ background: "#fff", color: "#166534" }}>💳 Top-Up</button></Link>
-          <Link href="/jadwal" style={{ flex: 1 }}><button className="btn" style={{ background: "#062e16" }}>📅 Jadwal</button></Link>
+          <Link href="/topup" style={{ flex: 1 }}><button className="btn warn" style={{ background: "#D4AF37", color: "#141005" }}>💳 Top-Up</button></Link>
+          <Link href="/jadwal" style={{ flex: 1 }}><button className="btn" style={{ background: "#141005", border: "1px solid var(--gold-deep)" }}>📅 Jadwal</button></Link>
         </div>
       </div>
       {tung.length > 0 && <div className="banner err">🔒 Punya tunggakan {tung.length}x (Rp{(25000 * tung.length).toLocaleString("id-ID")}). Lunasi ke admin dulu untuk buka list berikutnya.</div>}
@@ -39,6 +43,7 @@ export default function Dashboard() {
           return <p key={r.id}>📅 <b>{s?.tanggal}</b> {s?.jam} • <span className="badge gray">{r.posisi || ""}</span> {badge}</p>;
         })}
       </div>
+      <button className="btn secondary small" onClick={() => signOut().then(reload)}>Logout</button>
     </div>
   );
 }

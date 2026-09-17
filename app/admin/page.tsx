@@ -2,13 +2,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  load, save, uid, walletOf, listAktif, kuotaAktif, quotaPosisi,
+  walletOf, listAktif, kuotaAktif, quotaPosisi,
   POSISI_MAIN, STATUS_LABEL, tunggakanOf,
 } from "../../lib/store";
+import { supa, fetchAll, adminUpdate, adminInsert, adminDelete } from "../../lib/db";
 import { downloadCSV, today, acakTim } from "../../lib/export";
 
 export default function Admin() {
   const [db, setDb] = useState<any>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [jadwalId, setJadwalId] = useState("");
   const [acak, setAcak] = useState<Record<string, { nama: string; posisi: string }[]> | null>(null);
   const [bantuanUser, setBantuanUser] = useState("");
@@ -17,127 +20,191 @@ export default function Admin() {
   const [walkinUser, setWalkinUser] = useState("");
   const [walkinPosisi, setWalkinPosisi] = useState<"GK" | "Belakang" | "Tengah" | "Depan">("Depan");
   const [walkinCara, setWalkinCara] = useState<"potong" | "cash">("potong");
-  useEffect(() => { setDb(load()); }, []);
+  const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
+  useEffect(() => { reload(); }, []);
+  if (err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
   if (!db) return <div className="card"><p>Memuat...</p></div>;
   const me = db.users.find((u: any) => u.id === db.sessionId);
-  if (!me || me.role !== "admin") return <div className="card"><h3>🛠️ Khusus admin</h3><p className="muted">Login sebagai <b>Admin / admin123</b> di Beranda.</p></div>;
+  if (!me || me.role !== "admin") return <div className="card"><h3>🛠️ Khusus admin</h3><p className="muted">Login dengan akun admin.</p></div>;
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    try { await fn(); await reload(); } catch (e: any) { alert(e.message); }
+    setBusy(false);
+  };
 
-  const refresh = () => setDb(load());
+  const refresh = reload;
   const namaOf = (id: string) => db.users.find((u: any) => u.id === id)?.nama || id;
+  const sb = () => supa();
 
-  // ---- approve ----
-  const approve = (id: string, ok: boolean) => {
-    const d = load(); const u = d.users.find((x: any) => x.id === id);
-    if (!u) return;
-    u.status = ok ? "approved" : "rejected"; save(d); refresh();
-  };
+  const approve = (id: string, ok: boolean) =>
+    run(() => adminUpdate("profiles", id, { status: ok ? "approved" : "rejected" }).then(() => {}));
 
-  // ---- verifikasi klaim ----
-  const verifKlaim = (txId: string, ok: boolean, alasan = "") => {
-    const d = load(); const t = d.txs.find((x: any) => x.id === txId);
-    if (!t || t.status !== "pending") return;
-    if (ok) {
-      t.status = "success";
-      const w = d.wallets[t.userId] || { paket: 0, reguler: 0 };
-      if (t.paket === "4x") { w.paket += 4; const u = d.users.find((x: any) => x.id === t.userId); if (u) u.is_member = true; }
-      else w.reguler += 1;
-      d.wallets[t.userId] = w;
-    } else {
-      if (!alasan) { const a = prompt("Alasan penolakan untuk pemain:"); if (a === null) return; alasan = a; }
-      t.status = "rejected"; t.catatan = (t.catatan || "") + ` [Ditolak: ${alasan}]`;
-    }
-    save(d); refresh();
-  };
-
-  // ---- hapus transaksi kas (salah input) + reverse kredit yang pernah diberikan ----
-  const hapusTx = (txId: string) => {
-    const d = load(); const t = d.txs.find((x: any) => x.id === txId);
+  const verifKlaim = async (txId: string, ok: boolean) => {
+    const t = db.txs.find((x: any) => x.id === txId);
     if (!t) return;
-    const granted = (t.kreditPaket || 0) + (t.kreditReguler || 0);
-    if (!confirm(`Hapus "${t.label}" (${(t.rupiah || 0).toLocaleString("id-ID")})?${granted > 0 && t.status === "success" ? `\nKredit yang sudah masuk (${granted}) akan ditarik kembali.` : ""}`)) return;
-    if (t.status === "success" && granted > 0) {
-      const w = d.wallets[t.userId] || { paket: 0, reguler: 0 };
-      w.paket = Math.max(0, w.paket - (t.kreditPaket || 0));
-      w.reguler = Math.max(0, w.reguler - (t.kreditReguler || 0));
-      d.wallets[t.userId] = w;
+    let alasan = "";
+    if (!ok) {
+      const a = prompt("Alasan penolakan untuk pemain:");
+      if (a === null) return;
+      alasan = a;
     }
-    d.txs = d.txs.filter((x: any) => x.id !== txId);
-    save(d); refresh();
+    await run(async () => {
+      if (ok) {
+        await adminUpdate("txs", txId, { status: "success" });
+        const w = walletOf(db, t.userId);
+        const patch = t.paket === "4x" ? { paket: w.paket + 4 } : { reguler: w.reguler + 1 };
+        // upsert wallet
+        const { error } = await sb().from("wallets").upsert({ user_id: t.userId, ...{ paket: walletOf(db, t.userId).paket, reguler: walletOf(db, t.userId).reguler, ...patch } });
+        if (error) throw new Error(error.message);
+        if (t.paket === "4x") await adminUpdate("profiles", t.userId, { is_member: true });
+      } else {
+        await adminUpdate("txs", txId, { status: "rejected", catatan: (t.catatan || "") + ` [Ditolak: ${alasan}]` });
+      }
+    });
   };
 
-  // ---- kurangi kredit manual ----
-  const kurangiKredit = (userId: string, kind: "paket" | "reguler") => {
-    const d = load(); const w = d.wallets[userId] || { paket: 0, reguler: 0 };
+  const manualTopup = (userId: string, kind: "1x" | "4x") =>
+    run(async () => {
+      const w = walletOf(db, userId);
+      const patch = kind === "1x" ? { reguler: w.reguler + 1 } : { paket: w.paket + 4 };
+      const { error } = await sb().from("wallets").upsert({ user_id: userId, paket: w.paket, reguler: w.reguler, ...patch });
+      if (error) throw new Error(error.message);
+      await adminInsert("txs", {
+        user_id: userId, label: `Top-up manual ${kind} (cash)`,
+        kredit_paket: kind === "4x" ? 4 : 0, kredit_reguler: kind === "1x" ? 1 : 0,
+        rupiah: kind === "1x" ? 25000 : 90000, metode: "manual_cash", status: "success",
+      });
+      if (kind === "4x") await adminUpdate("profiles", userId, { is_member: true });
+    });
+
+  const kurangiKredit = async (userId: string, kind: "paket" | "reguler") => {
+    const w = walletOf(db, userId);
     if ((w[kind] || 0) < 1) return alert("Kreditnya sudah 0");
     const alasan = prompt(`Kurangi 1 kredit ${kind} untuk ${namaOf(userId)}?\nIsi alasan (cth: walk-in tanpa list, koreksi):`);
     if (alasan === null) return;
-    w[kind] -= 1; d.wallets[userId] = w;
-    d.txs.push({ id: uid(), userId, label: `Kurangi 1 kredit ${kind} manual`, kreditPaket: 0, kreditReguler: 0, rupiah: 0, metode: "koreksi_minus", tanggal: new Date().toISOString(), status: "success", privateNote: alasan });
-    save(d); refresh();
+    await run(async () => {
+      const { error } = await sb().from("wallets").upsert({ user_id: userId, paket: w.paket - (kind === "paket" ? 1 : 0), reguler: w.reguler - (kind === "reguler" ? 1 : 0) });
+      if (error) throw new Error(error.message);
+      await adminInsert("txs", {
+        user_id: userId, label: `Kurangi 1 kredit ${kind} manual`, rupiah: 0,
+        metode: "koreksi_minus", status: "success", private_note: alasan,
+      });
+    });
   };
 
-  // ---- kredit manual: cash / bantuan privat / koreksi ----
-  const manualTopup = (userId: string, kind: "1x" | "4x", metode: string) => {
-    const d = load(); const w = d.wallets[userId] || { paket: 0, reguler: 0 };
-    if (kind === "1x") w.reguler += 1; else { w.paket += 4; const u = d.users.find((x: any) => x.id === userId); if (u) u.is_member = true; }
-    d.wallets[userId] = w;
-    d.txs.push({ id: uid(), userId, label: `Top-up manual ${kind} (${metode})`, kreditPaket: kind === "4x" ? 4 : 0, kreditReguler: kind === "1x" ? 1 : 0, rupiah: kind === "1x" ? 25000 : 90000, metode: `manual_${metode}`, tanggal: new Date().toISOString(), status: "success" });
-    save(d); refresh();
-  };
-  const beriBantuan = () => {
-    if (!bantuanUser) return alert("Pilih pemain dulu");
-    const d = load(); const w = d.wallets[bantuanUser] || { paket: 0, reguler: 0 };
-    const n = parseInt(bantuanKredit) || 1; w.reguler += n; d.wallets[bantuanUser] = w;
-    d.txs.push({ id: uid(), userId: bantuanUser, label: "Kredit admin", kreditPaket: 0, kreditReguler: n, rupiah: 0, metode: "bantuan_privat", tanggal: new Date().toISOString(), status: "success", privateNote: bantuanAlasan });
-    save(d); setBantuanUser(""); setBantuanAlasan(""); refresh();
-    alert("Kredit bantuan masuk. Pemain hanya melihat label netral 'Kredit admin'.");
-  };
+  const beriBantuan = () =>
+    run(async () => {
+      if (!bantuanUser) return alert("Pilih pemain dulu");
+      const n = parseInt(bantuanKredit) || 1;
+      const w = walletOf(db, bantuanUser);
+      const { error } = await sb().from("wallets").upsert({ user_id: bantuanUser, paket: w.paket, reguler: w.reguler + n });
+      if (error) throw new Error(error.message);
+      await adminInsert("txs", {
+        user_id: bantuanUser, label: "Kredit admin", kredit_reguler: n,
+        rupiah: 0, metode: "bantuan_privat", status: "success", private_note: bantuanAlasan,
+      });
+      setBantuanUser(""); setBantuanAlasan("");
+      alert("Kredit bantuan masuk. Pemain hanya melihat label netral 'Kredit admin'.");
+    });
+
   const toggleMember = (userId: string) => {
-    const d = load(); const u = d.users.find((x: any) => x.id === userId);
-    if (!u) return; u.is_member = !u.is_member; save(d); refresh();
+    const u = db.users.find((x: any) => x.id === userId);
+    run(() => adminUpdate("profiles", userId, { is_member: !u?.is_member }).then(() => {}));
   };
 
-  // ---- check-in ----
-  const checkin = (rsvpId: string, aksi: "lunas" | "belum" | "nodatang") => {
-    const d = load(); const r = d.rsvps.find((x: any) => x.id === rsvpId);
-    if (!r) return;
-    if (aksi === "lunas") {
-      r.status = "confirmed_lunas";
-      d.txs.push({ id: uid(), userId: r.userId, label: "Pelunasan di lapangan (25rb)", kreditPaket: 0, kreditReguler: 0, rupiah: 25000, metode: "pelunasan_cash", tanggal: new Date().toISOString(), status: "success" });
-    } else if (aksi === "belum") {
-      r.status = "wajib_bayar";
-      d.txs.push({ id: uid(), userId: r.userId, label: "Tunggakan: hadir tapi belum bayar (25rb)", kreditPaket: 0, kreditReguler: 0, rupiah: 25000, metode: "tagihan", tanggal: new Date().toISOString(), status: "success" });
-    } else {
-      if (r.status === "confirmed_lunas") { r.status = "no_show"; } // deposit hangus, tanpa utang
-      else {
-        r.status = "wajib_bayar";
-        d.txs.push({ id: uid(), userId: r.userId, label: "Tunggakan: tidak datang & belum bayar (25rb)", kreditPaket: 0, kreditReguler: 0, rupiah: 25000, metode: "tagihan", tanggal: new Date().toISOString(), status: "success" });
+  const hapusTx = async (txId: string) => {
+    const t = db.txs.find((x: any) => x.id === txId);
+    if (!t) return;
+    const granted = (t.kreditPaket || 0) + (t.kreditReguler || 0);
+    if (!confirm(`Hapus "${t.label}"?${granted > 0 && t.status === "success" ? `\nKredit yang sudah masuk (${granted}) akan ditarik kembali.` : ""}`)) return;
+    await run(async () => {
+      if (t.status === "success" && granted > 0) {
+        const w = walletOf(db, t.userId);
+        const { error } = await sb().from("wallets").upsert({
+          user_id: t.userId,
+          paket: Math.max(0, w.paket - (t.kreditPaket || 0)),
+          reguler: Math.max(0, w.reguler - (t.kreditReguler || 0)),
+        });
+        if (error) throw new Error(error.message);
       }
-    }
-    save(d); refresh();
+      await adminDelete("txs", txId);
+    });
   };
-  const voidTunggakan = (rsvpId: string) => {
+
+  const checkin = (rsvpId: string, aksi: "lunas" | "belum" | "nodatang") =>
+    run(async () => {
+      const r = db.rsvps.find((x: any) => x.id === rsvpId);
+      if (!r) return;
+      if (aksi === "lunas") {
+        await adminUpdate("rsvps", rsvpId, { status: "confirmed_lunas" });
+        await adminInsert("txs", {
+          user_id: r.userId, label: "Pelunasan di lapangan (25rb)", rupiah: 25000,
+          metode: "pelunasan_cash", status: "success",
+        });
+      } else if (aksi === "belum") {
+        await adminUpdate("rsvps", rsvpId, { status: "wajib_bayar" });
+        await adminInsert("txs", {
+          user_id: r.userId, label: "Tunggakan: hadir tapi belum bayar (25rb)", rupiah: 25000,
+          metode: "tagihan", status: "success",
+        });
+      } else {
+        if (r.status === "confirmed_lunas") {
+          await adminUpdate("rsvps", rsvpId, { status: "no_show" });
+        } else {
+          await adminUpdate("rsvps", rsvpId, { status: "wajib_bayar" });
+          await adminInsert("txs", {
+            user_id: r.userId, label: "Tunggakan: tidak datang & belum bayar (25rb)", rupiah: 25000,
+            metode: "tagihan", status: "success",
+          });
+        }
+      }
+    });
+
+  const voidTunggakan = async (rsvpId: string) => {
     const alasan = prompt("Alasan void (hanya terlihat admin):");
     if (alasan === null) return;
-    const d = load(); const r = d.rsvps.find((x: any) => x.id === rsvpId);
-    if (!r) return;
-    r.status = "cancelled";
-    d.txs.push({ id: uid(), userId: r.userId, label: "Tunggakan di-void admin", kreditPaket: 0, kreditReguler: 0, rupiah: 0, metode: "void", tanggal: new Date().toISOString(), status: "success", privateNote: alasan });
-    save(d); refresh();
+    await run(async () => {
+      const r = db.rsvps.find((x: any) => x.id === rsvpId);
+      await adminUpdate("rsvps", rsvpId, { status: "cancelled" });
+      await adminInsert("txs", {
+        user_id: r.userId, label: "Tunggakan di-void admin", rupiah: 0,
+        metode: "void", status: "success", private_note: alasan,
+      });
+    });
   };
 
-  // ---- export pemain ----
+  const tambahWalkin = () =>
+    run(async () => {
+      if (!jadwal || !walkinUser) return alert("Pilih pemain dulu");
+      if (jadwal.status === "full_booked" || jadwal.status === "tutup") return alert("Jadwal tutup/full booked");
+      if (roster.some((r: any) => r.userId === walkinUser)) return alert("Pemain ini sudah ada di list");
+      if (roster.length >= kuotaAktif(jadwal)) return alert("Kuota sudah penuh");
+      if (roster.filter((r: any) => (r.posisi || "Depan") === walkinPosisi).length >= quotaPosisi(jadwal, walkinPosisi)) return alert(`Slot ${walkinPosisi} penuh`);
+      const w = walletOf(db, walkinUser);
+      if (walkinCara === "potong") {
+        if (w.paket + w.reguler < 1) return alert("Kredit pemain 0 — pakai Lunas Cash atau isi kredit dulu");
+        const patch = w.paket > 0 ? { paket: w.paket - 1, reguler: w.reguler } : { paket: w.paket, reguler: w.reguler - 1 };
+        const { error } = await sb().from("wallets").upsert({ user_id: walkinUser, ...patch });
+        if (error) throw new Error(error.message);
+        await adminInsert("rsvps", { schedule_id: jadwal.id, user_id: walkinUser, status: "confirmed_lunas", posisi: walkinPosisi, metode: "deposit" });
+        await adminInsert("txs", { user_id: walkinUser, label: `Walk-in ${jadwal.tanggal} ${walkinPosisi} (potong 1 kredit)`, metode: "potong_deposit", status: "success" });
+      } else {
+        await adminInsert("rsvps", { schedule_id: jadwal.id, user_id: walkinUser, status: "confirmed_lunas", posisi: walkinPosisi, metode: "langsung" });
+        await adminInsert("txs", { user_id: walkinUser, label: `Walk-in ${jadwal.tanggal} ${walkinPosisi} (lunas cash 25rb)`, rupiah: 25000, metode: "pelunasan_cash", status: "success" });
+      }
+      setWalkinUser("");
+    });
+
   const exportPemain = () => {
     const rows = db.users.map((u: any) => {
       const w = walletOf(db, u.id);
       const tung = tunggakanOf(db, u.id).length;
       const main = db.rsvps.filter((r: any) => r.userId === u.id && r.status !== "cancelled").length;
-      return [u.nama, u.wa, u.role, u.status, u.is_member ? "Member" : "Non-member", w.paket, w.reguler, tung > 0 ? 25000 * tung : 0, main];
+      return [u.nama, u.wa, u.email || "", u.role, u.status, u.is_member ? "Member" : "Non-member", w.paket, w.reguler, tung > 0 ? 25000 * tung : 0, main];
     });
-    downloadCSV(`pemain-${today()}.csv`, ["Nama", "WA", "Role", "Status", "Member", "Kredit Paket", "Kredit Reguler", "Tunggakan Rp", "Total Ikut"], rows);
+    downloadCSV(`pemain-${today()}.csv`, ["Nama", "WA", "Email", "Role", "Status", "Member", "Kredit Paket", "Kredit Reguler", "Tunggakan Rp", "Total Ikut"], rows);
   };
 
-  // ---- roster per jadwal ----
   const jadwal = db.schedules.find((s: any) => s.id === jadwalId) || db.schedules.slice().sort((a: any, b: any) => a.tanggal.localeCompare(b.tanggal))[0];
   const roster = jadwal ? listAktif(db, jadwal.id) : [];
 
@@ -180,31 +247,6 @@ export default function Admin() {
     setAcak(acakTim(peserta));
   };
 
-  // ---- walk-in H-day: pemain datang tanpa isi list ----
-  const tambahWalkin = () => {
-    if (!jadwal || !walkinUser) return alert("Pilih pemain dulu");
-    const d = load();
-    const s = d.schedules.find((x: any) => x.id === jadwal.id);
-    if (!s) return;
-    if (s.status === "full_booked" || s.status === "tutup") return alert("Jadwal ini sedang tutup/full booked");
-    if (d.rsvps.some((r: any) => r.scheduleId === s.id && r.userId === walkinUser && r.status !== "cancelled")) return alert("Pemain ini sudah ada di list");
-    const aktif = d.rsvps.filter((r: any) => r.scheduleId === s.id && r.status !== "cancelled");
-    if (aktif.length >= kuotaAktif(s)) return alert("Kuota sudah penuh");
-    if (aktif.filter((r: any) => (r.posisi || "Depan") === walkinPosisi).length >= quotaPosisi(s, walkinPosisi as any)) return alert(`Slot ${walkinPosisi} penuh`);
-    if (walkinCara === "potong") {
-      const w = d.wallets[walkinUser] || { paket: 0, reguler: 0 };
-      if (w.paket + w.reguler < 1) return alert("Kredit pemain 0 — pakai opsi Lunas Cash atau isi kredit dulu");
-      if (w.paket > 0) w.paket -= 1; else w.reguler -= 1;
-      d.wallets[walkinUser] = w;
-      d.rsvps.push({ id: uid(), scheduleId: s.id, userId: walkinUser, status: "confirmed_lunas", posisi: walkinPosisi, metode: "deposit" });
-      d.txs.push({ id: uid(), userId: walkinUser, label: `Walk-in ${s.tanggal} ${walkinPosisi} (potong 1 kredit)`, kreditPaket: 0, kreditReguler: 0, rupiah: 0, metode: "potong_deposit", tanggal: new Date().toISOString(), status: "success" });
-    } else {
-      d.rsvps.push({ id: uid(), scheduleId: s.id, userId: walkinUser, status: "confirmed_lunas", posisi: walkinPosisi, metode: "langsung" });
-      d.txs.push({ id: uid(), userId: walkinUser, label: `Walk-in ${s.tanggal} ${walkinPosisi} (lunas cash 25rb)`, kreditPaket: 0, kreditReguler: 0, rupiah: 25000, metode: "pelunasan_cash", tanggal: new Date().toISOString(), status: "success" });
-    }
-    save(d); setWalkinUser(""); refresh();
-  };
-
   const pendings = db.users.filter((u: any) => u.status === "pending");
   const klaims = db.txs.filter((t: any) => t.status === "pending");
 
@@ -218,15 +260,16 @@ export default function Admin() {
         </div>
       </div>
       <p className="muted">Semua kerjaan lapangan cukup dari HP di halaman ini.</p>
+      {busy && <div className="banner info">⏳ Memproses...</div>}
 
       <div className="card">
         <h3>✅ Approve pendaftar <span className="badge blue">{pendings.length}</span></h3>
         {pendings.length === 0 && <p className="muted">Tidak ada antrian. Santai ☕</p>}
         {pendings.map((u: any) => (
           <div key={u.id} className="row" style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
-            <div style={{ flex: 1 }}><b style={{ fontSize: 17 }}>{u.nama}</b><br /><small className="muted">{u.wa}</small></div>
-            <button className="btn small" onClick={() => approve(u.id, true)}>Approve ✅</button>
-            <button className="btn danger small" onClick={() => approve(u.id, false)}>Tolak</button>
+            <div style={{ flex: 1 }}><b style={{ fontSize: 17 }}>{u.nama}</b><br /><small className="muted">{u.wa} • {u.email}</small></div>
+            <button className="btn small" disabled={busy} onClick={() => approve(u.id, true)}>Approve ✅</button>
+            <button className="btn danger small" disabled={busy} onClick={() => approve(u.id, false)}>Tolak</button>
           </div>
         ))}
       </div>
@@ -237,10 +280,10 @@ export default function Admin() {
         {klaims.map((t: any) => (
           <div key={t.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
             <b>{namaOf(t.userId)}</b> — Paket {t.paket} (Rp{(t.rupiah || 0).toLocaleString("id-ID")}) via <span className="badge gray">{t.metode}</span>
-            <br /><small className="muted">{t.catatan || ""} {t.bukti ? `• Bukti: ${t.bukti}` : ""} • {t.tanggal.slice(0, 16).replace("T", " ")}</small>
+            <br /><small className="muted">{t.catatan || ""} {t.bukti ? `• Bukti: ${t.bukti}` : ""} • {String(t.tanggal).slice(0, 16).replace("T", " ")}</small>
             <div className="row" style={{ marginTop: 6 }}>
-              <button className="btn small" onClick={() => verifKlaim(t.id, true)}>Setujui ✅</button>
-              <button className="btn danger small" onClick={() => verifKlaim(t.id, false)}>Tolak</button>
+              <button className="btn small" disabled={busy} onClick={() => verifKlaim(t.id, true)}>Setujui ✅</button>
+              <button className="btn danger small" disabled={busy} onClick={() => verifKlaim(t.id, false)}>Tolak</button>
             </div>
           </div>
         ))}
@@ -248,7 +291,7 @@ export default function Admin() {
 
       <div className="card">
         <h3>👥 Roster per tanggal</h3>
-        <select value={jadwal?.id || ""} onChange={(e) => { setJadwalId(e.target.value); setAcak(null); }}>
+        <select value={jadwal?.id || ""} disabled={busy} onChange={(e) => { setJadwalId(e.target.value); setAcak(null); }}>
           {db.schedules.slice().sort((a: any, b: any) => a.tanggal.localeCompare(b.tanggal)).map((s: any) => (
             <option key={s.id} value={s.id}>{s.tanggal} {s.jam} — {(STATUS_LABEL[s.status] || s.status)} ({listAktif(db, s.id).length}/{kuotaAktif(s)})</option>
           ))}
@@ -271,12 +314,12 @@ export default function Admin() {
                       </div>
                       {(r.status === "confirmed_langsung" || r.status === "confirmed_utang" || r.status === "wajib_bayar") && (
                         <>
-                          <button className="btn small" onClick={() => checkin(r.id, "lunas")}>Lunas ✅</button>
-                          {(r.status !== "wajib_bayar") && <button className="btn secondary small" onClick={() => checkin(r.id, "belum")}>Belum bayar</button>}
-                          {(r.status === "confirmed_utang" || r.status === "wajib_bayar") && <button className="btn secondary small" onClick={() => voidTunggakan(r.id)}>Void</button>}
+                          <button className="btn small" disabled={busy} onClick={() => checkin(r.id, "lunas")}>Lunas ✅</button>
+                          {(r.status !== "wajib_bayar") && <button className="btn secondary small" disabled={busy} onClick={() => checkin(r.id, "belum")}>Belum bayar</button>}
+                          {(r.status === "confirmed_utang" || r.status === "wajib_bayar") && <button className="btn secondary small" disabled={busy} onClick={() => voidTunggakan(r.id)}>Void</button>}
                         </>
                       )}
-                      {r.status === "confirmed_lunas" && <button className="btn secondary small" onClick={() => checkin(r.id, "nodatang")}>Tidak datang</button>}
+                      {r.status === "confirmed_lunas" && <button className="btn secondary small" disabled={busy} onClick={() => checkin(r.id, "nodatang")}>Tidak datang</button>}
                     </div>
                   ))}
                   {arr.length === 0 && <p className="muted"><small>— kosong —</small></p>}
@@ -296,7 +339,7 @@ export default function Admin() {
                   <option value="">— Pilih pemain —</option>
                   {db.users.filter((u: any) => u.status === "approved" && !roster.some((r: any) => r.userId === u.id)).map((u: any) => <option key={u.id} value={u.id}>{u.nama} (P{walletOf(db, u.id).paket}/R{walletOf(db, u.id).reguler})</option>)}
                 </select>
-                <select value={walkinPosisi} onChange={(e) => setWalkinPosisi(e.target.value as "GK" | "Belakang" | "Tengah" | "Depan")}>
+                <select value={walkinPosisi} onChange={(e) => setWalkinPosisi(e.target.value as any)}>
                   {POSISI_MAIN.map((p) => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
@@ -304,10 +347,10 @@ export default function Admin() {
                 <option value="potong">Potong 1 kredit pemain</option>
                 <option value="cash">Lunas cash 25rb di tempat</option>
               </select>
-              <button className="btn" onClick={tambahWalkin}>Tambah ke List ➜</button>
+              <button className="btn" disabled={busy} onClick={tambahWalkin}>Tambah ke List ➜</button>
             </div>
             {acak && (
-              <div className="card" style={{ background: "#FFFBEB" }}>
+              <div className="card" style={{ background: "#211a08" }}>
                 <h4>🎲 Hasil acakan (bisa acak ulang)</h4>
                 {Object.entries(acak).map(([tm, arr]) => (
                   <p key={tm}><b>Tim {tm} ({arr.length})</b><br /><small>{arr.map((p) => `${p.nama} (${p.posisi})`).join(", ")}</small></p>
@@ -325,11 +368,11 @@ export default function Admin() {
         {db.users.filter((u: any) => u.status === "approved").map((u: any) => (
           <div key={u.id} className="row" style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
             <div style={{ flex: 1 }}><b>{u.nama}</b> {u.is_member && <span className="badge yellow">⭐ Member</span>}<br /><small className="muted">P{walletOf(db, u.id).paket} / R{walletOf(db, u.id).reguler}</small></div>
-            <button className="btn secondary small" onClick={() => manualTopup(u.id, "1x", "cash")}>+1 cash</button>
-            <button className="btn secondary small" onClick={() => manualTopup(u.id, "4x", "cash")}>+4 cash</button>
-            <button className="btn secondary small" onClick={() => kurangiKredit(u.id, "reguler")}>−1 R</button>
-            <button className="btn secondary small" onClick={() => kurangiKredit(u.id, "paket")}>−1 P</button>
-            <button className="btn secondary small" onClick={() => toggleMember(u.id)}>{u.is_member ? "Cabut ⭐" : "Jadi ⭐"}</button>
+            <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "1x")}>+1 cash</button>
+            <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "4x")}>+4 cash</button>
+            <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler")}>−1 R</button>
+            <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "paket")}>−1 P</button>
+            <button className="btn secondary small" disabled={busy} onClick={() => toggleMember(u.id)}>{u.is_member ? "Cabut ⭐" : "Jadi ⭐"}</button>
           </div>
         ))}
         <h4 style={{ marginTop: 12 }}>🎗️ Kredit bantuan (privat)</h4>
@@ -343,7 +386,7 @@ export default function Admin() {
           </select>
         </div>
         <input placeholder="Alasan privat (hanya admin yang lihat)" value={bantuanAlasan} onChange={(e) => setBantuanAlasan(e.target.value)} />
-        <button className="btn" onClick={beriBantuan}>Beri Kredit Bantuan</button>
+        <button className="btn" disabled={busy} onClick={beriBantuan}>Beri Kredit Bantuan</button>
       </div>
 
       <div className="card">
@@ -366,14 +409,14 @@ export default function Admin() {
       </div>
 
       <div className="card">
-        <h3>📒 Kas terakhir <small className="muted">(salah input? hapus di sini — kredit yang terlanjur masuk ikut ditarik)</small></h3>
+        <h3>📒 Kas terakhir <small className="muted">(salah input? hapus — kredit ikut ditarik)</small></h3>
         <div className="tblwrap"><table>
           <thead><tr><th>Waktu</th><th>Pemain</th><th>Keterangan</th><th>Rp</th><th></th></tr></thead>
           <tbody>{db.txs.slice().reverse().slice(0, 30).map((t: any) => (
-            <tr key={t.id}><td>{t.tanggal.slice(5, 16).replace("T", " ")}</td><td>{db.users.find((u: any) => u.id === t.userId)?.nama}</td>
+            <tr key={t.id}><td>{String(t.tanggal).slice(5, 16).replace("T", " ")}</td><td>{db.users.find((u: any) => u.id === t.userId)?.nama}</td>
               <td>{t.metode === "bantuan_privat" ? "🎗️ Kredit admin (privat)" : t.label} <span className="badge gray">{t.metode}</span>{t.privateNote ? <><br /><small className="muted">🔒 {t.privateNote}</small></> : ""}</td>
-              <td>{t.rupiah.toLocaleString("id-ID")}</td>
-              <td><button className="btn danger small" onClick={() => hapusTx(t.id)}>Hapus</button></td></tr>
+              <td>{(t.rupiah || 0).toLocaleString("id-ID")}</td>
+              <td><button className="btn danger small" disabled={busy} onClick={() => hapusTx(t.id)}>Hapus</button></td></tr>
           ))}</tbody>
         </table></div>
       </div>

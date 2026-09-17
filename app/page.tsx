@@ -1,12 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { load, save, uid, reset, hasUtang, walletOf, totalKredit } from "../lib/store";
-import { BASECAMP, MAPS_URL } from "../lib/club";
+import { walletOf, totalKredit, hasUtang } from "../lib/store";
+import { fetchAll, signUp, signIn, signOut } from "../lib/db";
+import { BASECAMP } from "../lib/club";
 
 export default function Home() {
   const [db, setDb] = useState<any>(null);
-  useEffect(() => { setDb(load()); }, []);
+  const [err, setErr] = useState("");
+  const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
+  useEffect(() => { reload(); }, []);
+  if (err) return <div className="card"><div className="banner err">⚠️ {err}</div><p className="muted"><small>Cek env Supabase + koneksi.</small></p></div>;
   if (!db) return <div className="card"><p>Memuat...</p></div>;
   const me = db.users.find((u: any) => u.id === db.sessionId);
 
@@ -26,7 +30,7 @@ export default function Home() {
             <div className="price"><span className="muted">Sekali main</span><br /><b>Rp25rb</b><br /><small className="muted">= 1 kredit</small></div>
             <div className="price hot sel"><span className="tag">JADI MEMBER ⭐</span><span className="muted">Paket 4x main</span><br /><b>Rp90rb</b><br /><small className="muted">= 4 kredit + member permanen</small></div>
           </div>
-          <AuthBox onDone={() => setDb(load())} />
+          <AuthBox onDone={reload} />
         </div>
       ) : (
         <div>
@@ -35,48 +39,31 @@ export default function Home() {
             <div className="num">{totalKredit(walletOf(db, me.id))} kredit</div>
             <small>Paket {walletOf(db, me.id).paket} • Reguler {walletOf(db, me.id).reguler}</small>
             <div className="row" style={{ marginTop: 12 }}>
-              <Link href="/topup" style={{ flex: 1 }}><button className="btn warn" style={{ background: "#fff", color: "#166534" }}>💳 Top-Up</button></Link>
-              <Link href="/jadwal" style={{ flex: 1 }}><button className="btn" style={{ background: "#062e16" }}>📅 Isi List</button></Link>
+              <Link href="/topup" style={{ flex: 1 }}><button className="btn warn" style={{ background: "#D4AF37", color: "#141005" }}>💳 Top-Up</button></Link>
+              <Link href="/jadwal" style={{ flex: 1 }}><button className="btn" style={{ background: "#141005", border: "1px solid var(--gold-deep)" }}>📅 Isi List</button></Link>
             </div>
           </div>
           {me.status === "pending" && (
-            <div className="banner warn">⏳ Akunmu menunggu approve admin. Tunjukkan nama/WA-mu ke admin di lapangan atau grup.</div>
+            <div className="banner warn">⏳ Akunmu menunggu approve admin. Hubungi pengurus di menu Kontak.</div>
           )}
           {hasUtang(db, me.id) && (
-            <div className="banner err">⚠️ Kamu ada utang Rp25rb (bayar di lapangan). Lunasi dulu sebelum isi list lagi.</div>
+            <div className="banner err">⚠️ Kamu ada tunggakan — lunasi ke admin dulu untuk buka list berikutnya.</div>
           )}
           <div className="row">
-            <button className="btn secondary small" onClick={() => { const d = load(); d.sessionId = null; save(d); setDb(load()); }}>Logout</button>
-            <Link href="/liga"><button className="btn secondary small">🏆 Liga Bulanan</button></Link>
+            <button className="btn secondary small" onClick={() => signOut().then(reload)}>Logout</button>
+            <Link href="/liga"><button className="btn secondary small">🏆 Liga</button></Link>
+            <Link href="/kontak"><button className="btn secondary small">📞 Kontak</button></Link>
           </div>
         </div>
       )}
 
       <div className="card">
         <h3>📅 Jadwal terdekat</h3>
-        {db.schedules.map((s: any) => {
-          const ikut = db.rsvps.filter((r: any) => r.scheduleId === s.id && r.status.startsWith("confirmed")).length;
-          const pct = Math.min(100, Math.round((ikut / s.kuota) * 100));
-          return (
-            <div key={s.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
-              <div className="ticket">
-                <div className="datebox">{s.tanggal.slice(8, 10)}<span>{s.tanggal.slice(0, 7)}</span></div>
-                <div style={{ flex: 1 }}>
-                  <b>{s.jam}</b><br /><small className="muted">{s.lokasi}</small>
-                  <div className="progress"><i style={{ width: pct + "%" }} /></div>
-                  <small className="muted">{ikut}/{s.kuota} ikut {ikut >= s.kuota ? "• PENUH" : ""}</small>
-                </div>
-              </div>
-            </div>
-          );
+        {db.schedules.slice(0, 3).map((s: any) => {
+          const ikut = db.rsvps.filter((r: any) => r.scheduleId === s.id && r.status !== "cancelled").length;
+          return <p key={s.id}>📅 {s.tanggal} {s.jam} — {s.lokasi} — <b>{ikut}/{s.status === "sparing" ? 14 : s.kuota}</b></p>;
         })}
         <Link href="/jadwal"><button className="btn">Lihat & Isi List ➜</button></Link>
-      </div>
-
-      <div className="card">
-        <h4>ℹ️ Akun trial</h4>
-        <p className="muted">Admin bawaan: <b>Admin / admin123</b>. Data hanya di browser ini.</p>
-        <button className="btn secondary small" onClick={reset}>Reset data trial</button>
       </div>
     </div>
   );
@@ -84,19 +71,22 @@ export default function Home() {
 
 function AuthBox({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<"login" | "daftar">("daftar");
-  const [nama, setNama] = useState(""); const [wa, setWa] = useState(""); const [pass, setPass] = useState("");
-  const submit = () => {
-    const db = load();
-    if (mode === "daftar") {
-      if (!nama || !wa || !pass) return alert("Isi Nama, No WA, dan Password dulu ya");
-      if (db.users.some((u: any) => u.wa === wa)) return alert("No WA sudah terdaftar, pilih Login");
-      const u = { id: uid(), nama, wa, pass, role: "player" as const, status: "pending" as const, is_member: false };
-      db.users.push(u); db.sessionId = u.id; save(db); onDone();
-    } else {
-      const u = db.users.find((x: any) => (x.nama === nama || x.wa === nama) && x.pass === pass);
-      if (!u) return alert("Login gagal. Coba Admin / admin123");
-      db.sessionId = u.id; save(db); onDone();
-    }
+  const [nama, setNama] = useState(""); const [wa, setWa] = useState("");
+  const [email, setEmail] = useState(""); const [pass, setPass] = useState("");
+  const [msg, setMsg] = useState("");
+  const submit = async () => {
+    setMsg("");
+    try {
+      if (mode === "daftar") {
+        if (!nama || !wa || !email || !pass) return setMsg("Isi Nama, WA, Email, dan Password dulu ya");
+        await signUp(email.trim(), pass, nama.trim(), wa.trim());
+        setMsg("✅ Terdaftar! Menunggu approve admin. Kamu sudah login.");
+      } else {
+        if (!email || !pass) return setMsg("Isi Email dan Password");
+        await signIn(email.trim(), pass);
+      }
+      onDone();
+    } catch (e: any) { setMsg("⚠️ " + (e.message || "Gagal")); }
   };
   return (
     <div style={{ marginTop: 12 }}>
@@ -104,10 +94,14 @@ function AuthBox({ onDone }: { onDone: () => void }) {
         <button className="btn secondary small" onClick={() => setMode("daftar")}>Daftar baru</button>
         <button className="btn secondary small" onClick={() => setMode("login")}>Sudah punya akun</button>
       </div>
-      <input placeholder="Nama lengkap" value={nama} onChange={(e) => setNama(e.target.value)} />
-      {mode === "daftar" && <input placeholder="No WA, cth 0812xxxx" value={wa} onChange={(e) => setWa(e.target.value)} />}
-      <input placeholder="Password" type="password" value={pass} onChange={(e) => setPass(e.target.value)} />
+      {mode === "daftar" && (<>
+        <input placeholder="Nama lengkap" value={nama} onChange={(e) => setNama(e.target.value)} />
+        <input placeholder="No WA, cth 0812xxxx" value={wa} onChange={(e) => setWa(e.target.value)} />
+      </>)}
+      <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <input placeholder="Password (min 6 karakter)" type="password" value={pass} onChange={(e) => setPass(e.target.value)} />
       <button className="btn" onClick={submit}>{mode === "daftar" ? "Daftar Sekarang" : "Masuk"}</button>
+      {msg && <p>{msg}</p>}
       <p className="muted"><small>Setelah daftar, statusmu <b>pending</b> sampai di-approve admin.</small></p>
     </div>
   );

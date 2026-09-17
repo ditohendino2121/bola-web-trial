@@ -3,7 +3,7 @@ import "./globals.css";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { load, walletOf, totalKredit } from "../lib/store";
+import { supa } from "../lib/supabase";
 import { BASECAMP } from "../lib/club";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -32,14 +32,20 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [nama, setNama] = useState("");
 
   useEffect(() => {
-    try {
-      const db = load();
-      const me = db.users.find((u: any) => u.id === db.sessionId);
-      if (me) {
-        setKredit(totalKredit(walletOf(db, me.id)));
-        setNama(me.nama + (me.is_member ? " ⭐" : ""));
-      } else { setKredit(null); setNama(""); }
-    } catch { /* abaikan saat prerender */ }
+    (async () => {
+      try {
+        const sb = supa();
+        const { data } = await sb.auth.getSession();
+        const uid = data.session?.user?.id;
+        if (!uid) { setKredit(null); setNama(""); return; }
+        const [p, w] = await Promise.all([
+          sb.from("profiles").select("nama,is_member").eq("id", uid).maybeSingle(),
+          sb.from("wallets").select("paket,reguler").eq("user_id", uid).maybeSingle(),
+        ]);
+        if (p.data) setNama(p.data.nama + (p.data.is_member ? " ⭐" : ""));
+        if (w.data) setKredit((w.data.paket || 0) + (w.data.reguler || 0));
+      } catch { /* env belum diisi / offline */ }
+    })();
   }, [path]);
 
   const close = () => { if (typeof document !== "undefined") document.body.classList.remove("nav-open"); };
@@ -60,7 +66,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="saldo-mini">
-          {kredit !== null ? (<><small>{nama}</small><b>{kredit} kredit</b><small>1 kredit = 1x main</small></>) : (<small>Belum login.<br />Daftar di Beranda, gratis.</small>)}
+          {kredit !== null ? (<><small>{nama}</small><b>{kredit} kredit</b><small>1 kredit = 1x main</small></>) : (<small>Belum login.<br />Daftar di Beranda.</small>)}
         </div>
         <div className="basecamp-mini">📍 Basecamp:<br />{BASECAMP}</div>
       </aside>

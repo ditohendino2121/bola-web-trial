@@ -1,62 +1,41 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  load, save, hasUtang, uid, QUOTA_MAIN, POSISI_MAIN, countPosisi,
-  kuotaAktif, quotaPosisi, lewatH2, fmtBatas, STATUS_LABEL,
+  hasUtang, QUOTA_MAIN, POSISI_MAIN, kuotaAktif, quotaPosisi,
+  lewatH2, fmtBatas, STATUS_LABEL,
   type PosisiMain, type RsvpMetode,
 } from "../../lib/store";
+import { fetchAll, rsvp, batalRsvp } from "../../lib/db";
 
 export default function Jadwal() {
   const [db, setDb] = useState<any>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [posisiPilih, setPosisiPilih] = useState<Record<string, PosisiMain>>({});
-  useEffect(() => { setDb(load()); }, []);
+  const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
+  useEffect(() => { reload(); }, []);
+  if (err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
   if (!db) return <div className="card"><p>Memuat...</p></div>;
   const me = db.users.find((u: any) => u.id === db.sessionId);
   if (!me) return <div className="card"><h3>Login dulu yuk 🔐</h3><p className="muted">Daftar / login di Beranda, gratis.</p></div>;
   if (me.status !== "approved") return <div className="card"><div className="banner warn">⏳ Akun <b>{me.nama}</b> masih <b>{me.status}</b>. Minta admin approve dulu ya.</div></div>;
 
-  const ikut = (s: any, metode: RsvpMetode) => {
-    const d = load();
-    const posisi: PosisiMain = posisiPilih[s.id] || "Depan";
-    const mine = d.rsvps.find((r: any) => r.scheduleId === s.id && r.userId === me.id && r.status !== "cancelled");
-    if (mine) return alert("Kamu sudah isi list jadwal ini ✅");
-    if (s.status === "full_booked") return alert("Lapangan full booked 🙏");
-    if (s.status === "tutup") return alert("Jadwal ini ditutup admin.");
-    const aktif = d.rsvps.filter((r: any) => r.scheduleId === s.id && r.status !== "cancelled");
-    if (aktif.length >= kuotaAktif(s)) return alert("Kuotanya penuh 🙏 coba jadwal lain");
-    const isiPos = aktif.filter((r: any) => (r.posisi || "Depan") === posisi).length;
-    if (isiPos >= quotaPosisi(s, posisi)) return alert(`Slot ${posisi} penuh. Pilih posisi lain ya!`);
-    if (metode !== "langsung" && hasUtang(d, me.id)) return alert("Masih ada tunggakan. Lunasi dulu baru bisa isi list lagi 🙏");
-    if (metode === "langsung" && hasUtang(d, me.id)) return alert("Masih ada tunggakan. Lunasi dulu baru bisa isi list lagi 🙏");
-
-    if (metode === "deposit") {
-      const w = d.wallets[me.id] || { paket: 0, reguler: 0 };
-      if (w.paket + w.reguler < 1) return alert("Kredit habis. Top-up dulu atau pilih cara bayar lain.");
-      if (w.paket > 0) w.paket -= 1; else w.reguler -= 1;
-      d.wallets[me.id] = w;
-      d.rsvps.push({ id: uid(), scheduleId: s.id, userId: me.id, status: "confirmed_lunas", posisi, metode });
-      d.txs.push({ id: uid(), userId: me.id, label: `Main ${s.tanggal} ${posisi} (potong 1 kredit)`, kreditPaket: 0, kreditReguler: 0, rupiah: 0, metode: "potong_deposit", tanggal: new Date().toISOString(), status: "success" });
-    } else if (metode === "utang") {
-      d.rsvps.push({ id: uid(), scheduleId: s.id, userId: me.id, status: "confirmed_utang", posisi, metode });
-      d.txs.push({ id: uid(), userId: me.id, label: `Main ${s.tanggal} ${posisi} (utang 25K)`, kreditPaket: 0, kreditReguler: 0, rupiah: 25000, metode: "utang", tanggal: new Date().toISOString(), status: "success" });
-    } else {
-      d.rsvps.push({ id: uid(), scheduleId: s.id, userId: me.id, status: "confirmed_langsung", posisi, metode });
-      d.txs.push({ id: uid(), userId: me.id, label: `Main ${s.tanggal} ${posisi} (bayar cash di tempat)`, kreditPaket: 0, kreditReguler: 0, rupiah: 0, metode: "langsung", tanggal: new Date().toISOString(), status: "success" });
-    }
-    save(d); setDb(load());
+  const ikut = async (s: any, metode: RsvpMetode) => {
+    setBusy(true); setErr("");
+    try {
+      await rsvp(s.id, posisiPilih[s.id] || "Depan", metode);
+      await reload();
+    } catch (e: any) { alert(e.message); }
+    setBusy(false);
   };
 
-  const batal = (s: any) => {
+  const batal = async (s: any) => {
     if (lewatH2(s)) return alert(`Sudah lewat batas H-2 (${fmtBatas(s)}). Tidak bisa tarik list — tetap wajib bayar. Hubungi admin jika darurat.`);
     if (!confirm("Tarik list? Kredit/utangmu untuk jadwal ini dibatalkan.")) return;
-    const d = load();
-    const r = d.rsvps.find((x: any) => x.scheduleId === s.id && x.userId === me.id && x.status !== "cancelled");
-    if (!r) return;
-    if (r.status === "confirmed_lunas" && r.metode === "deposit") {
-      const w = d.wallets[me.id] || { paket: 0, reguler: 0 };
-      w.reguler += 1; d.wallets[me.id] = w;
-    }
-    r.status = "cancelled"; save(d); setDb(load());
+    setBusy(true);
+    try { await batalRsvp(s.id); await reload(); }
+    catch (e: any) { alert(e.message); }
+    setBusy(false);
   };
 
   const terkunci = hasUtang(db, me.id);
@@ -64,7 +43,7 @@ export default function Jadwal() {
   return (
     <div>
       <h2 style={{ margin: "4px 0" }}>📅 Mau ikut yang mana?</h2>
-      <p className="muted">Kuota 28 (GK 4 • Belakang/Tengah/Depan @8). Sparing = 14. Tarik list terakhir <b>H-2</b>.</p>
+      <p className="muted">Pilih posisi dulu, lalu ikut. Kuota per game 28 orang: GK 4 • Belakang 8 • Tengah 8 • Depan 8.</p>
       {terkunci && <div className="banner err">🔒 Kamu punya tunggakan. Lunasi ke admin dulu untuk buka list berikutnya.</div>}
       {db.schedules.slice().sort((a: any, b: any) => a.tanggal.localeCompare(b.tanggal)).map((s: any) => {
         const list = db.rsvps.filter((r: any) => r.scheduleId === s.id && r.status !== "cancelled");
@@ -107,22 +86,22 @@ export default function Jadwal() {
                 ditutup ? null : penuh ? <div className="banner err">Kuota penuh. Coba jadwal lain ya 🙏</div> : terkunci ? null : (
                   <>
                     <label><small className="muted"><b>Main sebagai:</b></small></label>
-                    <select value={pos} onChange={(e) => setPosisiPilih((v) => ({ ...v, [s.id]: e.target.value as PosisiMain }))}>
+                    <select value={pos} disabled={busy} onChange={(e) => setPosisiPilih((v) => ({ ...v, [s.id]: e.target.value as PosisiMain }))}>
                       {POSISI_MAIN.map((p) => {
                         const isi = list.filter((r: any) => (r.posisi || "Depan") === p).length;
                         const q = quotaPosisi(s, p);
                         return <option key={p} value={p} disabled={isi >= q}>{p} — sisa {Math.max(0, q - isi)}{isi >= q ? " (PENUH)" : ""}</option>;
                       })}
                     </select>
-                    <button className="btn" onClick={() => ikut(s, "deposit")}>✅ {pos} — Potong 1 Kredit</button>
-                    <button className="btn secondary" onClick={() => ikut(s, "utang")}>📝 {pos} — Utang Dulu (25K)</button>
-                    <button className="btn secondary" onClick={() => ikut(s, "langsung")}>💵 {pos} — Bayar Cash di Tempat</button>
+                    <button className="btn" disabled={busy} onClick={() => ikut(s, "deposit")}>✅ {pos} — Potong 1 Kredit</button>
+                    <button className="btn secondary" disabled={busy} onClick={() => ikut(s, "utang")}>📝 {pos} — Utang Dulu (25K)</button>
+                    <button className="btn secondary" disabled={busy} onClick={() => ikut(s, "langsung")}>💵 {pos} — Bayar Cash di Tempat</button>
                   </>
                 )
               ) : (
                 h2 || mine.status === "wajib_bayar" || mine.status === "no_show"
                   ? <div className="banner warn">Lewat H-2 / sudah wajib bayar — tidak bisa tarik list. Hubungi admin jika darurat.</div>
-                  : <button className="btn danger" onClick={() => batal(s)}>Tarik List ({mine.posisi}) — batas {fmtBatas(s)}</button>
+                  : <button className="btn danger" disabled={busy} onClick={() => batal(s)}>Tarik List ({mine.posisi}) — batas {fmtBatas(s)}</button>
               )}
             </div>
             <div style={{ marginTop: 8 }}>

@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { load, save, uid, saldoAwalBulan } from "../../../lib/store";
+import { saldoAwalBulan } from "../../../lib/store";
+import { fetchAll, adminInsert, adminUpdate, adminDelete } from "../../../lib/db";
 import { JENIS_PENGELUARAN, BASECAMP } from "../../../lib/club";
 import { downloadCSV } from "../../../lib/export";
 
 const rp = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
-const bulanKey = (iso: string) => (iso || "").slice(0, 7); // YYYY-MM
+const bulanKey = (iso: string) => (iso || "").slice(0, 7);
 const namaBulan = (key: string) => {
   const [y, m] = key.split("-");
   const names = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -15,6 +16,8 @@ const namaBulan = (key: string) => {
 
 export default function Keuangan() {
   const [db, setDb] = useState<any>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [bulan, setBulan] = useState(new Date().toISOString().slice(0, 7));
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [jenis, setJenis] = useState<string>(JENIS_PENGELUARAN[0]);
@@ -28,22 +31,25 @@ export default function Keuangan() {
   const [inEditId, setInEditId] = useState<string | null>(null);
   const [kasAwal, setKasAwal] = useState("");
   const [kasAwalTgl, setKasAwalTgl] = useState("");
-  useEffect(() => { setDb(load()); }, []);
+  const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
+  useEffect(() => { reload(); }, []);
+  if (err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
   if (!db) return <div className="card"><p>Memuat...</p></div>;
   const me = db.users.find((u: any) => u.id === db.sessionId);
-  if (!me || me.role !== "admin") return <div className="card"><h3>🛠️ Khusus admin</h3><p className="muted">Login sebagai <b>Admin / admin123</b>.</p></div>;
+  if (!me || me.role !== "admin") return <div className="card"><h3>🛠️ Khusus admin</h3><p className="muted">Login dengan akun admin.</p></div>;
 
-  const refresh = () => setDb(load());
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    try { await fn(); await reload(); } catch (e: any) { alert(e.message); }
+    setBusy(false);
+  };
   const namaOf = (id: string) => db.users.find((u: any) => u.id === id)?.nama || id;
 
-  // Pemasukan bulan ini: (1) otomatis dari kas + (2) manual/sponsor
   const pemasukan = db.txs.filter((t: any) => t.status === "success" && (t.rupiah || 0) > 0 && bulanKey(t.tanggal) === bulan);
   const manualMasuk = (db.incomes || []).filter((e: any) => bulanKey(e.tanggal) === bulan);
   const totalOtomatis = pemasukan.reduce((a: number, t: any) => a + (t.rupiah || 0), 0);
   const totalManual = manualMasuk.reduce((a: number, e: any) => a + (e.nominal || 0), 0);
   const totalMasuk = totalOtomatis + totalManual;
-  const masukPerMetode: Record<string, number> = {};
-  pemasukan.forEach((t: any) => { masukPerMetode[t.metode] = (masukPerMetode[t.metode] || 0) + (t.rupiah || 0); });
 
   const keluar = (db.expenses || []).filter((e: any) => bulanKey(e.tanggal) === bulan);
   const totalKeluar = keluar.reduce((a: number, e: any) => a + (e.nominal || 0), 0);
@@ -53,53 +59,47 @@ export default function Keuangan() {
   const saldoAwal = saldoAwalBulan(db, bulan);
   const saldoAkhir = saldoAwal + surplus;
 
-  const simpanKasAwal = () => {
-    const nom = parseInt(kasAwal.replace(/\D/g, "")) || 0;
-    if (!kasAwalTgl) return alert("Isi tanggal kas awal dulu ya (boleh 0 kalau mulai dari nol)");
-    const d = load();
-    d.settings = { kasAwal: nom, kasAwalTanggal: kasAwalTgl };
-    save(d); setKasAwal(""); setKasAwalTgl(""); refresh();
-  };
+  const simpanKasAwal = () =>
+    run(async () => {
+      const nom = parseInt(kasAwal.replace(/\D/g, "")) || 0;
+      if (!kasAwalTgl) return alert("Isi tanggal kas awal dulu ya");
+      await adminUpdate("settings", 1, { kas_awal: nom, kas_awal_tanggal: kasAwalTgl }, "id");
+      setKasAwal(""); setKasAwalTgl("");
+    });
 
-  const simpan = () => {
-    const nom = parseInt(nominal.replace(/\D/g, "")) || 0;
-    if (!tanggal || !ket || nom <= 0) return alert("Isi tanggal, keterangan, dan nominal dulu ya");
-    const d = load();
-    if (editId) {
-      const e = d.expenses.find((x: any) => x.id === editId);
-      if (!e) return;
-      e.tanggal = tanggal; e.jenis = jenis; e.keterangan = ket; e.nominal = nom;
-      setEditId(null);
-    } else {
-      d.expenses.push({ id: uid(), tanggal, jenis, keterangan: ket, nominal: nom });
-    }
-    save(d); setKet(""); setNominal(""); refresh();
-  };
+  const simpan = () =>
+    run(async () => {
+      const nom = parseInt(nominal.replace(/\D/g, "")) || 0;
+      if (!tanggal || !ket || nom <= 0) return alert("Isi tanggal, keterangan, dan nominal dulu ya");
+      if (editId) {
+        await adminUpdate("expenses", editId, { tanggal, jenis, keterangan: ket, nominal: nom });
+        setEditId(null);
+      } else {
+        await adminInsert("expenses", { tanggal, jenis, keterangan: ket, nominal: nom });
+      }
+      setKet(""); setNominal("");
+    });
   const hapus = (id: string) => {
     if (!confirm("Hapus pengeluaran ini?")) return;
-    const d = load(); d.expenses = d.expenses.filter((x: any) => x.id !== id);
-    save(d); refresh();
+    run(() => adminDelete("expenses", id).then(() => {}));
   };
   const mulaiEdit = (e: any) => { setEditId(e.id); setTanggal(e.tanggal); setJenis(e.jenis); setKet(e.keterangan); setNominal(String(e.nominal)); };
 
-  const simpanMasuk = () => {
-    const nom = parseInt(inNominal.replace(/\D/g, "")) || 0;
-    if (!inTanggal || !inSumber || nom <= 0) return alert("Isi tanggal, sumber sponsor, dan nominal dulu ya");
-    const d = load();
-    if (inEditId) {
-      const e = d.incomes.find((x: any) => x.id === inEditId);
-      if (!e) return;
-      e.tanggal = inTanggal; e.sumber = inSumber; e.keterangan = inKet; e.nominal = nom;
-      setInEditId(null);
-    } else {
-      d.incomes.push({ id: uid(), tanggal: inTanggal, sumber: inSumber, keterangan: inKet, nominal: nom });
-    }
-    save(d); setInSumber(""); setInKet(""); setInNominal(""); refresh();
-  };
+  const simpanMasuk = () =>
+    run(async () => {
+      const nom = parseInt(inNominal.replace(/\D/g, "")) || 0;
+      if (!inTanggal || !inSumber || nom <= 0) return alert("Isi tanggal, sumber sponsor, dan nominal dulu ya");
+      if (inEditId) {
+        await adminUpdate("incomes", inEditId, { tanggal: inTanggal, sumber: inSumber, keterangan: inKet, nominal: nom });
+        setInEditId(null);
+      } else {
+        await adminInsert("incomes", { tanggal: inTanggal, sumber: inSumber, keterangan: inKet, nominal: nom });
+      }
+      setInSumber(""); setInKet(""); setInNominal("");
+    });
   const hapusMasuk = (id: string) => {
     if (!confirm("Hapus pemasukan ini?")) return;
-    const d = load(); d.incomes = d.incomes.filter((x: any) => x.id !== id);
-    save(d); refresh();
+    run(() => adminDelete("incomes", id).then(() => {}));
   };
   const mulaiEditMasuk = (e: any) => { setInEditId(e.id); setInTanggal(e.tanggal); setInSumber(e.sumber); setInKet(e.keterangan || ""); setInNominal(String(e.nominal)); };
 
@@ -109,7 +109,7 @@ export default function Keuangan() {
     rows.push(["Kas awal", db.settings?.kasAwalTanggal || "", db.settings?.kasAwal || 0]);
     rows.push(["Saldo awal bulan", "", saldoAwal]);
     rows.push(["PEMASUKAN OTOMATIS (KAS)"]);
-    pemasukan.forEach((t: any) => rows.push([t.tanggal.slice(0, 10), namaOf(t.userId), t.label, t.metode, t.rupiah]));
+    pemasukan.forEach((t: any) => rows.push([String(t.tanggal).slice(0, 10), namaOf(t.userId), t.label, t.metode, t.rupiah]));
     rows.push(["PEMASUKAN MANUAL / SPONSOR"]);
     manualMasuk.forEach((e: any) => rows.push([e.tanggal, e.sumber, e.keterangan, "sponsor/manual", e.nominal]));
     rows.push(["Total Pemasukan", "", "", "", totalMasuk]);
@@ -134,6 +134,7 @@ export default function Keuangan() {
     <div>
       <p><Link href="/admin">← Kembali ke Admin</Link></p>
       <h2 style={{ margin: "4px 0" }}>💰 Keuangan & Laba Rugi</h2>
+      {busy && <div className="banner info">⏳ Memproses...</div>}
 
       <div className="card no-print">
         <label><small className="muted"><b>Periode laporan</b></small></label>
@@ -142,12 +143,12 @@ export default function Keuangan() {
 
       <div className="card no-print">
         <h3>🏦 Kas awal</h3>
-        <p className="muted"><small>Uang kas yang sudah ada sebelum web dipakai. Sekarang: <b>{rp(db.settings?.kasAwal || 0)}</b> per {db.settings?.kasAwalTanggal || "-"} • Saldo awal {namaBulan(bulan)}: <b>{rp(saldoAwal)}</b> (otomatis terbawa)</small></p>
+        <p className="muted"><small>Sekarang: <b>{rp(db.settings?.kasAwal || 0)}</b> per {db.settings?.kasAwalTanggal || "-"} • Saldo awal {namaBulan(bulan)}: <b>{rp(saldoAwal)}</b></small></p>
         <div className="grid2">
-          <input placeholder="Nominal kas awal, cth: 1500000" inputMode="numeric" value={kasAwal} onChange={(e) => setKasAwal(e.target.value)} />
+          <input placeholder="Nominal kas awal" inputMode="numeric" value={kasAwal} onChange={(e) => setKasAwal(e.target.value)} />
           <input type="date" value={kasAwalTgl} onChange={(e) => setKasAwalTgl(e.target.value)} />
         </div>
-        <button className="btn secondary" onClick={simpanKasAwal}>Simpan Kas Awal</button>
+        <button className="btn secondary" disabled={busy} onClick={simpanKasAwal}>Simpan Kas Awal</button>
       </div>
 
       <div className="pl-doc" id="pl-doc">
@@ -171,7 +172,7 @@ export default function Keuangan() {
           <thead><tr><th>Tanggal</th><th>Dari</th><th>Keterangan</th><th style={{ textAlign: "right" }}>Nominal</th></tr></thead>
           <tbody>
             {pemasukan.map((t: any) => (
-              <tr key={t.id}><td>{t.tanggal.slice(0, 10)}</td><td>{namaOf(t.userId)}</td><td>{t.label} <small>({t.metode})</small></td><td style={{ textAlign: "right" }}>{rp(t.rupiah)}</td></tr>
+              <tr key={t.id}><td>{String(t.tanggal).slice(0, 10)}</td><td>{namaOf(t.userId)}</td><td>{t.label} <small>({t.metode})</small></td><td style={{ textAlign: "right" }}>{rp(t.rupiah)}</td></tr>
             ))}
             {pemasukan.length === 0 && <tr><td colSpan={4}><small className="muted">Belum ada pemasukan kas bulan ini.</small></td></tr>}
           </tbody>
@@ -207,7 +208,7 @@ export default function Keuangan() {
           </tbody>
         </table>
 
-        <h4 style={{ marginTop: 20, pageBreakBefore: "auto" }}>C. Laporan Arus Kas — {namaBulan(bulan)}</h4>
+        <h4 style={{ marginTop: 20 }}>C. Laporan Arus Kas — {namaBulan(bulan)}</h4>
         <table>
           <thead><tr><th>Uraian</th><th style={{ textAlign: "right" }}>Nominal</th></tr></thead>
           <tbody>
@@ -226,8 +227,6 @@ export default function Keuangan() {
             <tr><td className="total">V. Saldo akhir bulan (kas di tangan)</td><td className="total" style={{ textAlign: "right" }}>{rp(saldoAkhir)}</td></tr>
           </tbody>
         </table>
-        <p><small className="muted">Rincian pemasukan per metode: {Object.entries(masukPerMetode).map(([k, v]) => `${k} ${rp(v as number)}`).join(" • ") || "-"}</small></p>
-        <p><small className="muted">Rincian pengeluaran per jenis: {Object.entries(keluarPerJenis).map(([k, v]) => `${k} ${rp(v as number)}`).join(" • ") || "-"}</small></p>
         <p><small className="muted">Catatan: deposit paket adalah titipan main pemain (bukan laba bersih). Laporan ini adalah arus kas komunitas.</small></p>
 
         <div className="ttd">
@@ -245,7 +244,7 @@ export default function Keuangan() {
       </div>
 
       <div className="card no-print">
-        <h3>{editId ? "✏️ Ubah pengeluaran" : "➕ Catat pengeluaran"}</h3>
+        <h3>➕ Catat pengeluaran</h3>
         <div className="grid2">
           <div><label><small className="muted"><b>Tanggal</b></small></label>
             <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} /></div>
@@ -256,19 +255,18 @@ export default function Keuangan() {
         </div>
         <input placeholder="Keterangan, cth: Sewa Lapangan ABC 2 jam" value={ket} onChange={(e) => setKet(e.target.value)} />
         <input placeholder="Nominal, cth: 500000" inputMode="numeric" value={nominal} onChange={(e) => setNominal(e.target.value)} />
-        <button className="btn" onClick={simpan}>{editId ? "Simpan Perubahan" : "Simpan Pengeluaran"}</button>
+        <button className="btn" disabled={busy} onClick={simpan}>{editId ? "Simpan Perubahan" : "Simpan Pengeluaran"}</button>
         {editId && <button className="btn secondary" onClick={() => { setEditId(null); setKet(""); setNominal(""); }}>Batal edit</button>}
       </div>
 
       <div className="card no-print">
-        <h3>🤝 {inEditId ? "Ubah pemasukan sponsor" : "Catat pemasukan sponsor / manual"}</h3>
-        <p className="muted"><small>Otomatis dari kas sudah masuk PL sendiri — form ini khusus sponsor & pemasukan luar kas.</small></p>
+        <h3>🤝 Pemasukan sponsor / manual</h3>
         <label><small className="muted"><b>Tanggal</b></small></label>
         <input type="date" value={inTanggal} onChange={(e) => setInTanggal(e.target.value)} />
         <input placeholder="Sumber, cth: Sponsor Toko Berkah Jaya" value={inSumber} onChange={(e) => setInSumber(e.target.value)} />
-        <input placeholder="Keterangan (opsional), cth: untuk sewa 2x main" value={inKet} onChange={(e) => setInKet(e.target.value)} />
+        <input placeholder="Keterangan (opsional)" value={inKet} onChange={(e) => setInKet(e.target.value)} />
         <input placeholder="Nominal, cth: 1000000" inputMode="numeric" value={inNominal} onChange={(e) => setInNominal(e.target.value)} />
-        <button className="btn" onClick={simpanMasuk}>{inEditId ? "Simpan Perubahan" : "Simpan Pemasukan"}</button>
+        <button className="btn" disabled={busy} onClick={simpanMasuk}>{inEditId ? "Simpan Perubahan" : "Simpan Pemasukan"}</button>
         {inEditId && <button className="btn secondary" onClick={() => { setInEditId(null); setInSumber(""); setInKet(""); setInNominal(""); }}>Batal edit</button>}
         <div className="tblwrap" style={{ marginTop: 10 }}><table>
           <thead><tr><th>Tanggal</th><th>Sumber</th><th>Keterangan</th><th>Nominal</th><th></th></tr></thead>
@@ -277,7 +275,6 @@ export default function Keuangan() {
               <tr key={e.id}><td>{e.tanggal}</td><td><b>{e.sumber}</b></td><td>{e.keterangan || "-"}</td><td><b>{rp(e.nominal)}</b></td>
                 <td><button className="btn secondary small" onClick={() => mulaiEditMasuk(e)}>Ubah</button> <button className="btn danger small" onClick={() => hapusMasuk(e.id)}>Hapus</button></td></tr>
             ))}
-            {(db.incomes || []).length === 0 && <tr><td colSpan={5}><small className="muted">Belum ada pemasukan sponsor.</small></td></tr>}
           </tbody>
         </table></div>
       </div>

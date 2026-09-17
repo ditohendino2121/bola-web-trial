@@ -1,18 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
-import { load, save, walletOf, totalKredit, uid } from "../../lib/store";
-
-// GANTI dengan QRIS & rekening komunitas aslimu di sini:
-const QRIS_INFO = "QRIS Komunitas — [Nama] • [No. QRIS]";
-const REK_INFO = "Transfer — Bank [___] No [___] a.n. [___]";
+import { walletOf, totalKredit } from "../../lib/store";
+import { fetchAll, kirimKlaim } from "../../lib/db";
 
 export default function Topup() {
   const [db, setDb] = useState<any>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [paket, setPaket] = useState<"1x" | "4x">("4x");
   const [metode, setMetode] = useState("qris");
   const [bukti, setBukti] = useState("");
   const [catatan, setCatatan] = useState("");
-  useEffect(() => { setDb(load()); }, []);
+  const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
+  useEffect(() => { reload(); }, []);
+  if (err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
   if (!db) return <div className="card"><p>Memuat...</p></div>;
   const me = db.users.find((u: any) => u.id === db.sessionId);
   if (!me) return <div className="card"><h3>Login dulu yuk 🔐</h3></div>;
@@ -20,19 +21,17 @@ export default function Topup() {
   const harga = paket === "1x" ? 25000 : 90000;
   const klaimAktif = db.txs.find((t: any) => t.userId === me.id && t.status === "pending");
 
-  const kirim = () => {
+  const kirim = async () => {
     if (klaimAktif) return alert("Masih ada klaim menunggu verifikasi. Tunggu admin proses dulu ya.");
-    if ((metode === "qris" || metode === "transfer") && !bukti && !confirm("Belum isi info bukti. Tetap kirim? (lebih cepat diverifikasi kalau ada bukti)")) return;
-    const d = load();
-    d.txs.push({
-      id: uid(), userId: me.id,
-      label: `Klaim top-up ${paket} via ${metode} (Rp${harga.toLocaleString("id-ID")})`,
-      kreditPaket: 0, kreditReguler: 0, rupiah: harga,
-      metode: `klaim_${metode}`, tanggal: new Date().toISOString(), status: "pending",
-      paket, bukti, catatan,
-    });
-    save(d); setDb(load()); setBukti(""); setCatatan("");
-    alert("✅ Konfirmasi terkirim! Tunggu admin cek & approve. Kredit masuk setelah disetujui.");
+    if ((metode === "qris" || metode === "transfer") && !bukti && !confirm("Belum isi info bukti. Tetap kirim?")) return;
+    setBusy(true);
+    try {
+      await kirimKlaim(me.id, paket, metode, harga, bukti, catatan);
+      setBukti(""); setCatatan("");
+      await reload();
+      alert("✅ Konfirmasi terkirim! Tunggu admin cek & approve. Kredit masuk setelah disetujui.");
+    } catch (e: any) { alert(e.message); }
+    setBusy(false);
   };
 
   const mine = db.txs.filter((t: any) => t.userId === me.id).slice().reverse();
@@ -63,14 +62,14 @@ export default function Topup() {
           <option value="transfer">Transfer bank</option>
           <option value="cash">Cash (titip / di lapangan)</option>
         </select>
-        {metode === "qris" && <div className="banner info">📱 Bayar ke: <b>{QRIS_INFO}</b><br />Nominal pas Rp{harga.toLocaleString("id-ID")}, lalu konfirmasi di bawah.</div>}
-        {metode === "transfer" && <div className="banner info">🏦 Transfer ke: <b>{REK_INFO}</b><br />Nominal pas Rp{harga.toLocaleString("id-ID")}, lalu konfirmasi di bawah.</div>}
+        {metode === "qris" && <div className="banner info">📱 Bayar ke QRIS komunitas nominal pas Rp{harga.toLocaleString("id-ID")}, lalu konfirmasi di bawah. (Detail QRIS tanya admin di menu Kontak.)</div>}
+        {metode === "transfer" && <div className="banner info">🏦 Transfer nominal pas Rp{harga.toLocaleString("id-ID")}, lalu konfirmasi di bawah. (No. rekening tanya admin di menu Kontak.)</div>}
         {metode === "cash" && <div className="banner warn">💵 Cash: bayar langsung ke admin di lapangan. Admin bisa input tanpa klaim — tapi boleh juga kirim konfirmasi ini.</div>}
         {(metode === "qris" || metode === "transfer") && (
-          <input placeholder="Info bukti, cth: 'BCA 14.32 Budi' / nama file struk" value={bukti} onChange={(e) => setBukti(e.target.value)} />
+          <input placeholder="Info bukti, cth: 'BCA 14.32 Budi'" value={bukti} onChange={(e) => setBukti(e.target.value)} />
         )}
         <input placeholder="Catatan (opsional), cth: titip ke Andi" value={catatan} onChange={(e) => setCatatan(e.target.value)} />
-        <button className="btn" onClick={kirim}>Kirim Konfirmasi ke Admin ➜</button>
+        <button className="btn" disabled={busy} onClick={kirim}>Kirim Konfirmasi ke Admin ➜</button>
       </div>
 
       <div className="card">
@@ -79,7 +78,7 @@ export default function Topup() {
           <thead><tr><th>Waktu</th><th>Keterangan</th><th>Status</th></tr></thead>
           <tbody>
             {mine.map((t: any) => (
-              <tr key={t.id}><td>{t.tanggal.slice(5, 16).replace("T", " ")}</td>
+              <tr key={t.id}><td>{String(t.tanggal).slice(5, 16).replace("T", " ")}</td>
                 <td>{t.metode === "bantuan_privat" ? "🎗️ Kredit admin" : t.label}<br /><small className="muted">{t.catatan || ""}</small></td>
                 <td>{t.status === "pending" ? <span className="badge yellow">⏳ Dicek</span> : t.status === "rejected" ? <span className="badge red">Ditolak</span> : <span className="badge green">✅ OK</span>}</td></tr>
             ))}

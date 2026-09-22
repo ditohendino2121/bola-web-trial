@@ -19,8 +19,10 @@ export interface Tx {
 }
 export interface Wallet { paket: number; reguler: number; paket_gk: number; reguler_gk: number; }
 export interface Goal { scorerId: string; }
-export interface Match { id: string; home: string; away: string; sh: number | null; sa: number | null; goals: Goal[]; tanggal?: string; jam?: string; lokasi?: string; }
+export interface Match { id: string; home: string; away: string; sh: number | null; sa: number | null; goals: Goal[]; tanggal?: string; jam?: string; lokasi?: string; edition_id?: string | null; }
 export interface TeamMember { userId: string; posisi: "GK" | "Belakang" | "Tengah" | "Depan"; }
+export interface LeagueEdition { id: string; label: string; tanggal: string; created_at: string; }
+export interface PlayerStat { id: string; match_id: string; user_id: string; team: string; posisi: string; gol: number; assist: number; aksi_kunci: number; shot_on_target: number; kartu: string; blunder: number; nilai_oto: number | null; override: number | null; catatan_override?: string; }
 export interface Expense { id: string; tanggal: string; jenis: string; keterangan: string; nominal: number; }
 export interface ManualIncome { id: string; tanggal: string; sumber: string; keterangan: string; nominal: number; }
 
@@ -33,6 +35,8 @@ export interface DB {
   teams: Record<string, TeamMember[]>;
   matches: Match[];
   leagueLocked: boolean;
+  editions: LeagueEdition[];
+  playerStats: PlayerStat[];
   expenses: Expense[];
   incomes: ManualIncome[];
   settings: { kasAwal: number; kasAwalTanggal: string };

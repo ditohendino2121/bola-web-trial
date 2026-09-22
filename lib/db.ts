@@ -32,7 +32,7 @@ export async function sessionId(): Promise<string | null> {
 export async function fetchAll(): Promise<DB> {
   const sb = supa();
   const sid = await sessionId();
-  const [users, schedules, rsvps, txs, wallets, members, matches, meta, expenses, incomes, settings] =
+  const [users, schedules, rsvps, txs, wallets, members, matches, meta, expenses, incomes, settings, editions, playerStats] =
     await Promise.all([
       sb.from("profiles").select("*").order("created_at", { ascending: true }),
       sb.from("schedules").select("*").order("tanggal", { ascending: true }),
@@ -45,9 +45,11 @@ export async function fetchAll(): Promise<DB> {
       sb.from("expenses").select("*").order("tanggal", { ascending: false }),
       sb.from("incomes").select("*").order("tanggal", { ascending: false }),
       sb.from("settings").select("*").limit(1).maybeSingle(),
+      sb.from("league_editions").select("*").order("tanggal", { ascending: true }),
+      sb.from("league_player_stats").select("*"),
     ]);
-  const err = [users, schedules, rsvps, txs, wallets, members, matches, expenses, incomes].find((r) => r.error);
-  if (err?.error) throw new Error("Gagal ambil data: " + err.error.message);
+  const err = [users, schedules, rsvps, txs, wallets, members, matches, expenses, incomes, editions, playerStats].find((r: any) => r.error);
+  if (err?.error) throw new Error("Gagal ambil data: " + (err as any).error.message);
 
   const wrec: DB["wallets"] = {};
   (wallets.data || []).forEach((w: any) => { wrec[w.user_id] = { paket: w.paket || 0, reguler: w.reguler || 0, paket_gk: w.paket_gk || 0, reguler_gk: w.reguler_gk || 0 }; });
@@ -63,9 +65,13 @@ export async function fetchAll(): Promise<DB> {
     teams,
     matches: (matches.data || []).map((m: any) => ({
       id: m.id, home: m.home, away: m.away, sh: m.sh, sa: m.sa,
-      goals: m.goals || [], tanggal: m.tanggal || "", jam: m.jam || "", lokasi: m.lokasi || "",
+      goals: m.goals || [], tanggal: m.tanggal || "", jam: m.jam || "", lokasi: m.lokasi || "", edition_id: m.edition_id || null,
     })),
     leagueLocked: !!meta.data?.locked,
+    editions: (editions.data || []).map((e: any) => ({ id: e.id, label: e.label, tanggal: e.tanggal, created_at: e.created_at })),
+    playerStats: (playerStats.data || []).map((p: any) => ({
+      id: p.id, match_id: p.match_id, user_id: p.user_id, team: p.team, posisi: p.posisi, gol: p.gol, assist: p.assist, aksi_kunci: p.aksi_kunci, shot_on_target: p.shot_on_target, kartu: p.kartu, blunder: p.blunder, nilai_oto: p.nilai_oto, override: p.override, catatan_override: p.catatan_override,
+    })),
     expenses: expenses.data || [],
     incomes: incomes.data || [],
     settings: settings.data

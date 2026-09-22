@@ -1,20 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { klasemen, topSkor, QUOTA_POSISI } from "../../lib/store";
 import { fetchAll, adminInsert, adminUpdate, adminDelete } from "../../lib/db";
 import { supa } from "../../lib/supabase";
 
 const medals = ["🥇", "🥈", "🥉"];
+const FIXTURES: [string,string][] = [["A","B"],["C","D"],["A","C"],["B","D"],["A","D"],["B","C"]];
 
 export default function Liga() {
   const [db, setDb] = useState<any>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [tim, setTim] = useState("A"); const [posisi, setPosisi] = useState("Depan");
-  const [sh, setSh] = useState(""); const [sa, setSa] = useState("");
-  const [golInput, setGolInput] = useState(""); const [matchId, setMatchId] = useState("");
-  const [ntHome, setNtHome] = useState("A"); const [ntAway, setNtAway] = useState("B");
-  const [ntTgl, setNtTgl] = useState(""); const [ntJam, setNtJam] = useState("20:00"); const [ntLok, setNtLok] = useState("");
+  const [edTanggal, setEdTanggal] = useState(""); const [edLabel, setEdLabel] = useState("");
+  const [selectedEd, setSelectedEd] = useState<string | null>(null);
   const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
   useEffect(() => { reload(); }, []);
   if (err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
@@ -22,13 +22,58 @@ export default function Liga() {
   const me = db.users.find((u: any) => u.id === db.sessionId);
   const isAdmin = me?.role === "admin";
   const isMember = !!me?.is_member;
-  const k = klasemen(db.matches); const ts = topSkor(db);
   const locked: boolean = !!db.leagueLocked;
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     try { await fn(); await reload(); } catch (e: any) { alert(e.message); }
     setBusy(false);
   };
+
+  // derived
+  const editions: any[] = db.editions || [];
+  const playerStats: any[] = db.playerStats || [];
+  const matches: any[] = db.matches || [];
+  // auto-select latest edition
+  const curEdId = selectedEd || (editions[editions.length-1]?.id || null);
+  const curMatches = curEdId ? matches.filter((m:any)=>m.edition_id===curEdId) : matches;
+
+  // stats helpers
+  const kAll = klasemen(matches);
+  const kCur = klasemen(curMatches);
+  // top skor from playerStats (new) with fallback to old goals
+  const topFromStats = (() => {
+    const map: Record<string, {nama:string, tim:string, gol:number}> = {};
+    for (const ps of playerStats) {
+      const u = db.users.find((x:any)=>x.id===ps.user_id);
+      const key = ps.user_id;
+      if (!map[key]) map[key] = { nama: u?.nama || key, tim: ps.team, gol: 0 };
+      map[key].gol += ps.gol || 0;
+    }
+    // fallback if no stats yet, use old klasemen topSkor
+    if (Object.keys(map).length===0) return topSkor(db);
+    return Object.values(map).sort((a,b)=>b.gol-a.gol);
+  })();
+  // player stats avg
+  const statsAvg = (() => {
+    const agg: Record<string, any> = {};
+    for (const ps of playerStats) {
+      const u = db.users.find((x:any)=>x.id===ps.user_id);
+      const key = ps.user_id;
+      if (!agg[key]) agg[key] = { nama: u?.nama||key, team: ps.team, posisi: ps.posisi, main:0, totalNilai:0, totalGol:0, countNilai:0, terbaik:0 };
+      agg[key].main += 1;
+      agg[key].totalGol += ps.gol||0;
+      const final = ps.override ?? ps.nilai_oto;
+      if (final !== null && final !== undefined) {
+        agg[key].totalNilai += Number(final);
+        agg[key].countNilai += 1;
+        agg[key].terbaik = Math.max(agg[key].terbaik, Number(final));
+      }
+    }
+    return Object.values(agg).map((a:any)=> ({
+      ...a,
+      avg: a.countNilai ? Math.round((a.totalNilai / a.countNilai)*10)/10 : null,
+    })).filter((a:any)=>a.avg!==null).sort((a:any,b:any)=>b.avg-a.avg);
+  })();
 
   const daftar = () =>
     run(async () => {
@@ -44,34 +89,33 @@ export default function Liga() {
       await adminInsert("league_members", { team: tim, user_id: me.id, posisi });
     });
 
-  const simpanSkor = () =>
+  const tambahManual = async (team: string, userId: string, pos: string) => {
+    if (!userId) return;
+    await run(async () => {
+      const arr = db.teams[team] || [];
+      if (arr.some((m:any)=>m.userId===userId)) return alert("Sudah di tim");
+      if (arr.length>=7) return alert("Tim penuh");
+      if (arr.filter((m:any)=>m.posisi===pos).length >= (QUOTA_POSISI[pos]||99)) return alert("Slot posisi penuh");
+      await adminInsert("league_members", { team, user_id: userId, posisi: pos });
+    });
+  };
+
+  const buatEdisi = () =>
     run(async () => {
-      if (!isAdmin) return alert("Hanya admin yang bisa input skor");
-      const mid = matchId || db.matches[0]?.id;
-      if (!mid) return;
-      const names = golInput.split(",").map((s) => s.trim()).filter(Boolean);
-      const goals = [];
-      for (const n of names) {
-        const u = db.users.find((x: any) => x.nama.toLowerCase() === n.toLowerCase());
-        goals.push({ scorerId: u ? u.id : n });
+      if (!edTanggal) return alert("Pilih tanggal edisi dulu");
+      const label = edLabel || `Edisi ${edTanggal}`;
+      const { data: ed, error } = await supa().from("league_editions").insert({ label, tanggal: edTanggal }).select().single();
+      if (error) throw new Error(error.message);
+      // 6 fixture
+      for (const [h,a] of FIXTURES) {
+        await supa().from("league_matches").insert({ home: h, away: a, edition_id: ed.id, tanggal: edTanggal });
       }
-      await adminUpdate("league_matches", mid, { sh: parseInt(sh), sa: parseInt(sa), goals });
-      setSh(""); setSa(""); setGolInput("");
+      setEdTanggal(""); setEdLabel(""); setSelectedEd(ed.id);
     });
 
-  const tambahMatch = () =>
-    run(async () => {
-      if (ntHome === ntAway) return alert("Tim home & away harus beda");
-      await adminInsert("league_matches", {
-        home: ntHome, away: ntAway, sh: null, sa: null, goals: [],
-        tanggal: ntTgl || null, jam: ntJam, lokasi: ntLok,
-      });
-      setNtTgl(""); setNtLok("");
-    });
-
-  const hapusMatch = (id: string) => {
-    if (!confirm("Hapus pertandingan ini?")) return;
-    run(() => adminDelete("league_matches", id).then(() => {}));
+  const hapusEdisi = (id: string) => {
+    if (!confirm("Hapus edisi + 6 laganya? (stats ikut hilang)")) return;
+    run(async () => { await supa().from("league_editions").delete().eq("id", id); });
   };
 
   const toggleLock = () => {
@@ -89,8 +133,8 @@ export default function Liga() {
 
   return (
     <div>
-      <h2 style={{ margin: "4px 0" }}>🏆 Liga 6 Bulan {locked && <span className="badge red">🔒 Skuad dikunci</span>}</h2>
-      <p className="muted">Khusus ⭐ Member • 4 tim @7 orang (GK 1, Belakang 2, Tengah 2, Depan 2) • Menang 3, seri 1.</p>
+      <h2 style={{ margin: "4px 0" }}>🏆 Liga MUBA FC {locked && <span className="badge red">🔒 Skuad dikunci</span>}</h2>
+      <p className="muted">Khusus ⭐ Member • 4 tim @7 orang (GK 1, Belakang 2, Tengah 2, Depan 2) • Menang 3, seri 1. 1 edisi = 6 laga (1 tim main 3x).</p>
       {me && !isMember && <div className="banner warn">Liga khusus member. <b>Beli paket 90rb di Top-Up</b> untuk jadi member permanen + daftar liga! 💪</div>}
 
       {!locked && (
@@ -112,62 +156,114 @@ export default function Liga() {
               const u = db.users.find((x: any) => x.id === m.userId);
               return <p key={i}><span className="badge gray">{m.posisi}</span> {u?.nama || m.userId} {isAdmin && <button className="btn secondary small" disabled={busy} onClick={() => keluarkan(t, m.userId)}>Keluarkan</button>}</p>;
             })}
+            {isAdmin && (db.teams[t]||[]).length <7 && (
+              <AdminAddToTeam team={t} db={db} onAdd={tambahManual} />
+            )}
             {(db.teams[t] || []).length === 0 && <p className="muted">Belum ada yang daftar.</p>}
           </div>
         ))}
       </div>
 
-      {isAdmin && <div className="card"><button className="btn secondary" disabled={busy} onClick={toggleLock}>{locked ? "🔓 Buka Kunci Skuad" : "🔒 Kunci Skuad"}</button></div>}
+      {isAdmin && <div className="card"><button className="btn secondary" disabled={busy} onClick={toggleLock}>{locked ? "🔓 Buka Kunci Skuad" : "🔒 Kunci Skuad 6 Bulan"}</button></div>}
 
       <div className="card">
-        <h3>📊 Klasemen</h3>
-        <div className="tblwrap"><table>
-          <thead><tr><th>#</th><th>Tim</th><th>M</th><th>W</th><th>D</th><th>L</th><th>Gol</th><th>+/-</th><th>Poin</th></tr></thead>
-          <tbody>{k.map((r: any, i: number) => <tr key={r.tim}><td>{i + 1}</td><td><b>Tim {r.tim}</b></td><td>{r.M}</td><td>{r.W}</td><td>{r.D}</td><td>{r.L}</td><td>{r.GM}-{r.GA}</td><td>{r.GD > 0 ? "+" + r.GD : r.GD}</td><td><b>{r.P}</b></td></tr>)}</tbody>
-        </table></div>
-      </div>
-
-      <div className="card">
-        <h3>👟 Top Skor</h3>
-        {ts.length === 0 && <p className="muted">Belum ada gol.</p>}
-        {ts.map((r: any, i: number) => <p key={i}><span className="medal">{medals[i] || "⚽"}</span> <b>{r.nama}</b> (Tim {r.tim}) — <b>{r.gol} gol</b></p>)}
-      </div>
-
-      <div className="card">
-        <h3>📅 Pertandingan</h3>
-        {db.matches.map((m: any) => (
-          <p key={m.id}><b>Tim {m.home}</b> vs <b>Tim {m.away}</b>{" "}
-            <span className={`badge ${m.sh === null ? "gray" : "green"}`}>{m.sh === null ? "belum main" : `${m.sh} : ${m.sa}`}</span>
-            {m.tanggal ? <small className="muted"> • {m.tanggal} {m.jam || ""} {m.lokasi || ""}</small> : null}{" "}
-            {isAdmin && <button className="btn secondary small" disabled={busy} onClick={() => hapusMatch(m.id)}>Hapus</button>}</p>
-        ))}
+        <h3>🗓️ Edisi Liga (1x sebulan)</h3>
         {isAdmin && (
-          <div style={{ marginTop: 10 }}>
-            <h4>➕ Buat jadwal tanding (admin, kapan saja)</h4>
+          <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 12, marginBottom: 10, background: "#211a08" }}>
+            <p className="muted"><small>Admin pick tanggal → 6 laga otomatis (tanpa jam). Pesan notif: jadwal liga sudah ada, silahkan konfirmasi kehadiran & pembayaran (2 tombol seperti biasa).</small></p>
             <div className="grid2">
-              <select value={ntHome} onChange={(e) => setNtHome(e.target.value)}>{["A", "B", "C", "D"].map((t) => <option key={t} value={t}>Home: Tim {t}</option>)}</select>
-              <select value={ntAway} onChange={(e) => setNtAway(e.target.value)}>{["A", "B", "C", "D"].map((t) => <option key={t} value={t}>Away: Tim {t}</option>)}</select>
+              <input type="date" value={edTanggal} onChange={(e)=>setEdTanggal(e.target.value)} />
+              <input placeholder="Label, cth: Edisi Oktober 2026" value={edLabel} onChange={(e)=>setEdLabel(e.target.value)} />
             </div>
-            <div className="grid2">
-              <input type="date" value={ntTgl} onChange={(e) => setNtTgl(e.target.value)} />
-              <input placeholder="Jam, cth 20:00" value={ntJam} onChange={(e) => setNtJam(e.target.value)} />
-            </div>
-            <input placeholder="Lokasi (opsional)" value={ntLok} onChange={(e) => setNtLok(e.target.value)} />
-            <button className="btn secondary" disabled={busy} onClick={tambahMatch}>Tambah Pertandingan</button>
-            <h4 style={{ marginTop: 12 }}>✏️ Input skor & gol</h4>
-            <select value={matchId} onChange={(e) => setMatchId(e.target.value)}>
-              <option value="">— Pilih pertandingan —</option>
-              {db.matches.map((m: any) => <option key={m.id} value={m.id}>Tim {m.home} vs Tim {m.away}{m.tanggal ? ` (${m.tanggal})` : ""}</option>)}
-            </select>
-            <div className="grid2">
-              <input placeholder="Skor home" value={sh} onChange={(e) => setSh(e.target.value)} />
-              <input placeholder="Skor away" value={sa} onChange={(e) => setSa(e.target.value)} />
-            </div>
-            <input placeholder="Pencetak gol, cth: Budi, Budi, Andi" value={golInput} onChange={(e) => setGolInput(e.target.value)} />
-            <button className="btn" disabled={busy} onClick={simpanSkor}>Simpan Skor ✅</button>
+            <button className="btn" disabled={busy||!edTanggal} onClick={buatEdisi}>+ Buat Edisi & 6 Laga Otomatis</button>
           </div>
         )}
+        {editions.length===0 && <p className="muted">Belum ada edisi. Admin buat edisi pertama.</p>}
+        <div className="row">
+          {editions.map((ed:any)=> (
+            <button key={ed.id} className={`btn secondary small ${curEdId===ed.id?"":""}`} style={{ borderColor: curEdId===ed.id?"var(--gold)":"" }} onClick={()=>setSelectedEd(ed.id)}>
+              {ed.label} • {ed.tanggal}
+            </button>
+          ))}
+        </div>
+        {curEdId && isAdmin && <button className="btn danger small" onClick={()=>hapusEdisi(curEdId)}>Hapus Edisi Ini</button>}
       </div>
+
+      <div className="card">
+        <h3>📊 Klasemen {curEdId ? "Edisi Ini" : "Overall"}</h3>
+        <div className="tblwrap"><table>
+          <thead><tr><th>#</th><th>Tim</th><th>M</th><th>W</th><th>D</th><th>L</th><th>Gol</th><th>+/-</th><th>Poin</th></tr></thead>
+          <tbody>{(curEdId?kCur:kAll).map((r: any, i: number) => <tr key={r.tim}><td>{i + 1}</td><td><b>Tim {r.tim}</b></td><td>{r.M}</td><td>{r.W}</td><td>{r.D}</td><td>{r.L}</td><td>{r.GM}-{r.GA}</td><td>{r.GD > 0 ? "+" + r.GD : r.GD}</td><td><b>{r.P}</b></td></tr>)}</tbody>
+        </table></div>
+        {curEdId && <p className="muted"><small>Overall: </small>{kAll.map(r=>`${r.tim}:${r.P}`).join(" • ")}</p>}
+      </div>
+
+      <div className="card">
+        <h3>👟 Top Skor {curEdId ? "Edisi Ini (dari stats)" : "Overall"}</h3>
+        {topFromStats.length === 0 && <p className="muted">Belum ada gol.</p>}
+        {topFromStats.slice(0,10).map((r: any, i: number) => <p key={i}><span className="medal">{medals[i] || "⚽"}</span> <b>{r.nama}</b> (Tim {r.tim}) — <b>{r.gol} gol</b></p>)}
+      </div>
+
+      <div className="card">
+        <h3>⭐ Player Stats — Rata-rata Nilai</h3>
+        <p className="muted"><small>Urut tertinggi. Filter posisi:</small></p>
+        <StatsTable stats={statsAvg} />
+      </div>
+
+      <div className="card">
+        <h3>📅 Pertandingan {curEdId ? "Edisi Ini" : "Semua"} (klik untuk nilai)</h3>
+        {(curEdId?curMatches:matches).map((m: any) => (
+          <Link key={m.id} href={`/liga/${m.id}`} style={{ textDecoration: "none" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid var(--line)" }}>
+              <span><b>Tim {m.home}</b> vs <b>Tim {m.away}</b> <span className={`badge ${m.sh===null?"gray":"green"}`}>{m.sh===null?"belum main":`${m.sh} : ${m.sa}`}</span></span>
+              <span className="badge gold">Detail ➜</span>
+            </div>
+          </Link>
+        ))}
+        {(curMatches.length===0) && <p className="muted">Belum ada laga di edisi ini.</p>}
+      </div>
+    </div>
+  );
+}
+
+function StatsTable({ stats }: { stats: any[] }) {
+  const [filter, setFilter] = useState<string>("Semua");
+  const filtered = filter==="Semua" ? stats : stats.filter((s:any)=>s.posisi===filter);
+  return (
+    <>
+      <div className="row">
+        {["Semua","GK","Belakang","Tengah","Depan"].map(f=> (
+          <button key={f} className={`btn secondary small ${filter===f?"":""}`} onClick={()=>setFilter(f)} style={{ borderColor: filter===f?"var(--gold)":"" }}>{f}</button>
+        ))}
+      </div>
+      <div className="tblwrap"><table>
+        <thead><tr><th>#</th><th>Pemain</th><th>Pos</th><th>Main</th><th>Gol</th><th>Avg</th><th>Terbaik</th></tr></thead>
+        <tbody>
+          {filtered.map((s:any,i:number)=> (
+            <tr key={s.nama}><td>{i+1}</td><td><b>{s.nama}</b> <span className="badge gray">{s.team}</span></td><td>{s.posisi}</td><td>{s.main}</td><td>{s.totalGol}</td><td><b>{s.avg.toFixed(1)}</b></td><td>{s.terbaik.toFixed(1)}</td></tr>
+          ))}
+        </tbody>
+      </table></div>
+      {filtered.length===0 && <p className="muted">Belum ada penilaian.</p>}
+    </>
+  );
+}
+
+function AdminAddToTeam({ team, db, onAdd }: { team:string; db:any; onAdd: any }) {
+  const [uid, setUid] = useState("");
+  const [pos, setPos] = useState("Depan");
+  return (
+    <div style={{ marginTop: 6, display:"flex", gap:6 }}>
+      <select value={uid} onChange={(e)=>setUid(e.target.value)} style={{ flex:1 }}>
+        <option value="">+ tambah manual</option>
+        {db.users.filter((u:any)=>u.status==="approved" && !["A","B","C","D"].some(t=> (db.teams[t]||[]).some((m:any)=>m.userId===u.id))).map((u:any)=> (
+          <option key={u.id} value={u.id}>{u.nama} ({u.wa})</option>
+        ))}
+      </select>
+      <select value={pos} onChange={(e)=>setPos(e.target.value)}>
+        <option>GK</option><option>Belakang</option><option>Tengah</option><option>Depan</option>
+      </select>
+      <button className="btn small" onClick={()=>{ onAdd(team, uid, pos); setUid(""); }}>+</button>
     </div>
   );
 }

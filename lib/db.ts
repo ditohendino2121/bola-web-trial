@@ -8,6 +8,7 @@ export { supa };
 const mapUser = (p: any) => ({
   id: p.id, nama: p.nama, wa: p.wa, email: p.email,
   role: p.role, status: p.status, is_member: !!p.is_member,
+  setuju_akad: !!p.setuju_akad, setuju_at: p.setuju_at, akad_version: p.akad_version,
 });
 const mapSchedule = (s: any) => ({
   id: s.id, tanggal: s.tanggal, jam: s.jam, lokasi: s.lokasi, kuota: s.kuota, status: s.status,
@@ -84,6 +85,11 @@ export async function signUp(email: string, pass: string, nama: string, wa: stri
     options: { data: { nama, wa } },
   });
   if (error) throw new Error(pesanAuth(error.message));
+}
+
+export async function setujuAkad(userId: string, version: string) {
+  const { error } = await supa().from("profiles").update({ setuju_akad: true, setuju_at: new Date().toISOString(), akad_version: version }).eq("id", userId);
+  if (error) throw new Error(error.message);
 }
 
 export async function signIn(email: string, pass: string) {

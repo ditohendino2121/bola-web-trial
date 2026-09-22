@@ -22,6 +22,9 @@ create table if not exists public.profiles (
   role text not null default 'player' check (role in ('admin','player')),
   status text not null default 'pending' check (status in ('pending','approved','rejected')),
   is_member boolean not null default false,
+  setuju_akad boolean not null default false,
+  setuju_at timestamptz,
+  akad_version text,
   created_at timestamptz not null default now()
 );
 

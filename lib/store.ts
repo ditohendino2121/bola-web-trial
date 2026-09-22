@@ -8,7 +8,7 @@ export type PosisiMain = "GK" | "Belakang" | "Tengah" | "Depan";
 export type ScheduleStatus = "buka" | "tutup" | "full_booked" | "sparing";
 export type TxStatus = "pending" | "success" | "rejected";
 
-export interface User { id: string; nama: string; wa: string; email: string; role: Role; status: Status; is_member: boolean; }
+export interface User { id: string; nama: string; wa: string; email: string; role: Role; status: Status; is_member: boolean; setuju_akad?: boolean; setuju_at?: string; akad_version?: string; }
 export interface Schedule { id: string; tanggal: string; jam: string; lokasi: string; kuota: number; status: ScheduleStatus; }
 export interface Rsvp { id: string; scheduleId: string; userId: string; status: RsvpStatus; posisi: PosisiMain; metode: RsvpMetode; pakaiGk?: boolean; }
 export interface Tx {

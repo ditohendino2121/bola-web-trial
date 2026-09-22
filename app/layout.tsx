@@ -22,6 +22,7 @@ const menu = [
   { href: "/topup", label: "Top-Up", ico: "💳" },
   { href: "/liga", label: "Liga", ico: "🏆" },
   { href: "/dashboard", label: "Saya", ico: "👤" },
+  { href: "/akad", label: "Akad", ico: "📜" },
   { href: "/kontak", label: "Kontak", ico: "📞" },
   { href: "/admin", label: "Admin", ico: "🛠️" },
 ];

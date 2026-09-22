@@ -96,9 +96,9 @@ function AkadPrompt({ userId, onDone }: { userId: string; onDone: () => void }) 
       )}
       <div style={{ marginTop: 10 }}>
         {AKAD_CHECKBOXES.map((t, i) => (
-          <label key={i} style={{ display: "flex", gap: 8, margin: "6px 0", fontSize: 13 }}><input type="checkbox" checked={checks[i]} onChange={(e) => setChecks((a) => a.map((v, k) => k === i ? e.target.checked : v))} /> {t}</label>
+          <label key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "9px 0", fontSize: 13, lineHeight: 1.5, cursor: "pointer" }}><input type="checkbox" className="akad-chk" checked={checks[i]} onChange={(e) => setChecks((a) => a.map((v, k) => k === i ? e.target.checked : v))} /> <span>{t}</span></label>
         ))}
-        <label style={{ display: "flex", gap: 8, margin: "10px 0", fontWeight: 700, fontSize: 13, background: "rgba(212,175,55,0.12)", padding: 8, borderRadius: 8 }}><input type="checkbox" checked={final} onChange={(e) => setFinal(e.target.checked)} /> Saya telah membaca, memahami, dan menyetujui Syarat dan Ketentuan Membership Futsal.</label>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "12px 0", fontWeight: 700, fontSize: 13, background: "rgba(212,175,55,0.12)", padding: "10px 12px", borderRadius: 10, cursor: "pointer", lineHeight: 1.5 }}><input type="checkbox" className="akad-chk" checked={final} onChange={(e) => setFinal(e.target.checked)} /> <span>Saya telah membaca, memahami, dan menyetujui Syarat dan Ketentuan Membership Futsal.</span></label>
       </div>
       <button className="btn" disabled={!all || busy} onClick={kirim}>{busy ? "Menyimpan..." : "✅ Saya Setuju & Lanjut"}</button>
       <p className="muted"><small>Versi {AKAD_VERSION} • Wajib untuk lanjut pakai web.</small></p>
@@ -153,9 +153,9 @@ function AuthBox({ onDone }: { onDone: () => void }) {
               <div style={{ maxHeight: 180, overflowY: "auto", background: "#0e0e10", border: "1px solid var(--line)", borderRadius: 10, padding: 10, whiteSpace: "pre-wrap", fontSize: 11 }}>{AKAD_TEKS}</div>
               <div style={{ marginTop: 8 }}>
                 {AKAD_CHECKBOXES.map((t, i) => (
-                  <label key={i} style={{ display: "flex", gap: 8, margin: "6px 0", fontSize: 12 }}><input type="checkbox" checked={checks[i]} onChange={(e) => setChecks((a) => a.map((v, k) => k === i ? e.target.checked : v))} /> {t}</label>
+                  <label key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "9px 0", fontSize: 12, lineHeight: 1.5, cursor: "pointer" }}><input type="checkbox" className="akad-chk" checked={checks[i]} onChange={(e) => setChecks((a) => a.map((v, k) => k === i ? e.target.checked : v))} /> <span>{t}</span></label>
                 ))}
-                <label style={{ display: "flex", gap: 8, margin: "8px 0", fontWeight: 700, fontSize: 12, background: "rgba(212,175,55,0.12)", padding: 8, borderRadius: 8 }}><input type="checkbox" checked={final} onChange={(e) => setFinal(e.target.checked)} /> Saya telah membaca, memahami, dan menyetujui Syarat dan Ketentuan Membership Futsal.</label>
+                <label style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "12px 0", fontWeight: 700, fontSize: 12, background: "rgba(212,175,55,0.12)", padding: "10px 12px", borderRadius: 10, cursor: "pointer", lineHeight: 1.5 }}><input type="checkbox" className="akad-chk" checked={final} onChange={(e) => setFinal(e.target.checked)} /> <span>Saya telah membaca, memahami, dan menyetujui Syarat dan Ketentuan Membership Futsal.</span></label>
               </div>
             </>
           )}

@@ -55,7 +55,11 @@ export async function fetchAll(): Promise<DB> {
   const wrec: DB["wallets"] = {};
   (wallets.data || []).forEach((w: any) => { wrec[w.user_id] = { paket: w.paket || 0, reguler: w.reguler || 0, paket_gk: w.paket_gk || 0, reguler_gk: w.reguler_gk || 0 }; });
   const teams: DB["teams"] = { A: [], B: [], C: [], D: [] };
-  (members.data || []).forEach((m: any) => { (teams[m.team] = teams[m.team] || []).push({ userId: m.user_id, posisi: m.posisi }); });
+  const pool: DB["pool"] = [];
+  (members.data || []).forEach((m: any) => {
+    if (!m.team) pool.push({ userId: m.user_id, posisi: m.posisi });
+    else (teams[m.team] = teams[m.team] || []).push({ userId: m.user_id, posisi: m.posisi });
+  });
 
   return {
     users: (users.data || []).map(mapUser),
@@ -64,6 +68,7 @@ export async function fetchAll(): Promise<DB> {
     txs: (txs.data || []).map(mapTx),
     wallets: wrec,
     teams,
+    pool,
     matches: (matches.data || []).map((m: any) => ({
       id: m.id, home: m.home, away: m.away, sh: m.sh, sa: m.sa,
       goals: m.goals || [], tanggal: m.tanggal || "", jam: m.jam || "", lokasi: m.lokasi || "", edition_id: m.edition_id || null,

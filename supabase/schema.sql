@@ -149,7 +149,7 @@ insert into public.league_meta (id, locked) values (1, false) on conflict (id) d
 
 create table if not exists public.league_members (
   id uuid primary key default gen_random_uuid(),
-  team text not null check (team in ('A','B','C','D')),
+  team text check (team is null or team in ('A','B','C','D')),
   user_id uuid not null unique references public.profiles(id) on delete cascade,
   posisi text not null check (posisi in ('GK','Belakang','Tengah','Depan'))
 );

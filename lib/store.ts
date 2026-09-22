@@ -33,6 +33,7 @@ export interface DB {
   txs: Tx[];
   wallets: Record<string, Wallet>;
   teams: Record<string, TeamMember[]>;
+  pool: TeamMember[]; // menunggu dikocok (team null)
   matches: Match[];
   leagueLocked: boolean;
   editions: LeagueEdition[];

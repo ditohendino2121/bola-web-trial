@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { klasemen, topSkor, QUOTA_POSISI } from "../../lib/store";
-import { fetchAll, adminInsert, adminUpdate, adminDelete } from "../../lib/db";
+import { klasemen, topSkor, QUOTA_POSISI, dikunciRSVP, lewatH2, fmtBatas, STATUS_LABEL, POSISI_MAIN, kuotaAktif, quotaPosisi } from "../../lib/store";
+import { fetchAll, adminInsert, adminUpdate, adminDelete, rsvp, batalRsvp } from "../../lib/db";
 import { supa } from "../../lib/supabase";
 
 const medals = ["🥇", "🥈", "🥉"];
@@ -155,9 +155,16 @@ export default function Liga() {
       const label = edLabel || `Edisi ${edTanggal}`;
       const { data: ed, error } = await supa().from("league_editions").insert({ label, tanggal: edTanggal }).select().single();
       if (error) throw new Error(error.message);
-      // 6 fixture
+      // 6 fixture + 6 jadwal liga (1 jadwal per laga, kuota 14, is_liga true)
       for (const [h,a] of FIXTURES) {
-        await supa().from("league_matches").insert({ home: h, away: a, edition_id: ed.id, tanggal: edTanggal });
+        const { data: m, error: e2 } = await supa().from("league_matches").insert({ home: h, away: a, edition_id: ed.id, tanggal: edTanggal }).select().single();
+        if (e2) throw new Error(e2.message);
+        // jadwal terhubung 1-1 ke laga (untuk RSVP & bayar per laga)
+        const { error: e3 } = await supa().from("schedules").insert({
+          tanggal: edTanggal, jam: "20:00-22:00", lokasi: `Liga ${label} — ${h} vs ${a}`,
+          kuota: 14, status: "buka", is_liga: true, edition_id: ed.id, liga_match_id: m.id,
+        });
+        if (e3) throw new Error(e3.message);
       }
       setEdTanggal(""); setEdLabel(""); setSelectedEd(ed.id);
     });
@@ -273,6 +280,54 @@ export default function Liga() {
         ))}
         {(curMatches.length===0) && <p className="muted">Belum ada laga di edisi ini.</p>}
       </div>
+
+      {curEdId && (()=> {
+        const jadwalLiga = db.schedules.filter((s:any)=> s.is_liga && s.edition_id===curEdId).sort((a:any,b:any)=> (a.liga_match_id||"").localeCompare(b.liga_match_id||""));
+        if (jadwalLiga.length===0) return null;
+        const myTeams: string[] = ["A","B","C","D"].filter((t:any)=> (db.teams[t]||[]).some((m:any)=>m.userId===me?.id));
+        return (
+          <div className="card">
+            <h3>💳 Konfirmasi Hadir & Bayar — Edisi Ini (khusus skuad)</h3>
+            <p className="muted"><small>Tiap laga = 1 jadwal bayar (potong kredit / cash di tempat). Bukan skuad tim itu → tidak ada tombol. Belum bayar setelah main → hutang + kunci. Posisi ikut skuadmu. Dianggap ikut bila tidak konfirmasi — hubungi admin untuk alih.</small></p>
+            {jadwalLiga.map((s:any)=>{
+              const m = matches.find((x:any)=> x.id===s.liga_match_id);
+              const allowed = m ? [m.home, m.away] : [];
+              const isAllowed = !me || myTeams.some((t:string)=> allowed.includes(t));
+              const myPos = (()=>{ for(const t of myTeams){ const mem=(db.teams[t]||[]).find((x:any)=>x.userId===me?.id); if(mem) return mem.posisi; } return "Depan"; })();
+              const list = db.rsvps.filter((r:any)=> r.scheduleId===s.id && r.status!=="cancelled");
+              const mine = list.find((r:any)=> r.userId===me?.id);
+              const ka = s.kuota || 14;
+              const pct = Math.min(100, Math.round(list.length/ka*100));
+              return (
+                <div key={s.id} style={{ border:"1px solid var(--line)", borderRadius:12, padding:10, margin:"8px 0", background: isAllowed?"":"#1a1a1a" }}>
+                  <b>Tim {m?.home} vs Tim {m?.away}</b> <span className={`badge ${s.status==="buka"?"green":"red"}`}>{STATUS_LABEL[s.status]||s.status}</span><br/>
+                  <small className="muted">📍 {s.lokasi} • 🗓️ {s.tanggal} {s.jam} • {list.length}/{ka} konfirmasi</small>
+                  <div className="progress"><i style={{ width: pct+"%", background: list.length>=ka?"#DC2626":undefined }} /></div>
+                  {!me ? <p className="muted"><small>Login dulu</small></p> : !isAllowed ? <div className="banner warn">Hanya skuad Tim {allowed.join(" & ")} yang bisa konfirmasi laga ini.</div> : (
+                    !mine ? (
+                      <div style={{ marginTop:6 }}>
+                        <button className="btn" disabled={busy || dikunciRSVP(db, me.id)} onClick={async()=>{
+                          try{ await rsvp(s.id, myPos, "deposit"); await reload(); }catch(e:any){ alert(e.message); }
+                        }}>✅ {myPos} — Potong 1 Kredit</button>
+                        <button className="btn secondary" disabled={busy || dikunciRSVP(db, me.id)} onClick={async()=>{
+                          try{ await rsvp(s.id, myPos, "langsung"); await reload(); }catch(e:any){ alert(e.message); }
+                        }}>💵 {myPos} — Cash di Tempat ({myPos==="GK"?"15rb":"25rb"})</button>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop:6 }}>
+                        <span className={`badge ${mine.status==="confirmed_lunas"?"green":"blue"}`}>{mine.status==="confirmed_lunas"?"✅ Lunas • "+mine.posisi:"💵 Di tempat • "+mine.posisi}</span>
+                        { !lewatH2(s) && mine.status!=="wajib_bayar" && <button className="btn danger small" style={{ marginLeft:6 }} disabled={busy} onClick={async()=>{ if(!confirm("Batal?")) return; try{ await batalRsvp(s.id); await reload(); }catch(e:any){ alert(e.message);} }}>Batal</button> }
+                      </div>
+                    )
+                  )}
+                  <p className="muted" style={{ margin:"4px 0" }}><small>Konfirmasi: {list.map((r:any)=> db.users.find((u:any)=>u.id===r.userId)?.nama + `(${r.posisi})`).join(", ") || "— belum ada —"}</small></p>
+                  <p className="muted"><small>Dianggap ikut bila tidak konfirmasi — hubungi admin untuk alih slot.</small></p>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }

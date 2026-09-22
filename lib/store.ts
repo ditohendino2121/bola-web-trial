@@ -9,7 +9,7 @@ export type ScheduleStatus = "buka" | "tutup" | "full_booked" | "sparing";
 export type TxStatus = "pending" | "success" | "rejected";
 
 export interface User { id: string; nama: string; wa: string; email: string; role: Role; status: Status; is_member: boolean; setuju_akad?: boolean; setuju_at?: string; akad_version?: string; }
-export interface Schedule { id: string; tanggal: string; jam: string; lokasi: string; kuota: number; status: ScheduleStatus; }
+export interface Schedule { id: string; tanggal: string; jam: string; lokasi: string; kuota: number; status: ScheduleStatus; is_liga?: boolean; edition_id?: string | null; liga_match_id?: string | null; }
 export interface Rsvp { id: string; scheduleId: string; userId: string; status: RsvpStatus; posisi: PosisiMain; metode: RsvpMetode; pakaiGk?: boolean; is_alihan?: boolean; alih_dari?: string; }
 export interface Tx {
   id: string; userId: string; label: string;

@@ -41,12 +41,14 @@ export default function Jadwal() {
   const terkunci = dikunciRSVP(db, me.id);
   const nLangsung = langsungBelumLunas(db, me.id).length;
 
+  const jadwalBiasa = db.schedules.filter((s:any)=>!s.is_liga).sort((a: any, b: any) => a.tanggal.localeCompare(b.tanggal));
   return (
     <div>
       <h2 style={{ margin: "4px 0" }}>📅 Mau ikut yang mana?</h2>
-      <p className="muted">Pilih posisi dulu, lalu ikut — potong kredit atau bayar cash di tempat. Kuota 28: GK 4 • Belakang/Tengah/Depan @8.</p>
+      <p className="muted">Jadwal FUN mingguan — potong kredit atau cash di tempat. Kuota 28: GK 4 • Belakang/Tengah/Depan @8. Untuk jadwal liga, buka panel <b>Liga</b>.</p>
       {terkunci && <div className="banner err">🔒 {nLangsung > 0 ? `Kamu ada ${nLangsung}x bayar-di-tempat yang belum dikonfirmasi lunas admin. Selesaikan dulu untuk buka list berikutnya.` : "Kamu punya tunggakan. Lunasi ke admin dulu untuk buka list berikutnya."}</div>}
-      {db.schedules.slice().sort((a: any, b: any) => a.tanggal.localeCompare(b.tanggal)).map((s: any) => {
+      {jadwalBiasa.length===0 && <div className="card"><p className="muted">Belum ada jadwal FUN. Admin buat di Kelola Jadwal.</p></div>}
+      {jadwalBiasa.map((s: any) => {
         const list = db.rsvps.filter((r: any) => r.scheduleId === s.id && r.status !== "cancelled");
         const mine = list.find((r: any) => r.userId === me.id);
         const ka = kuotaAktif(s);

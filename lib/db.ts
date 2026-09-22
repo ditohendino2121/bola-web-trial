@@ -12,6 +12,7 @@ const mapUser = (p: any) => ({
 });
 const mapSchedule = (s: any) => ({
   id: s.id, tanggal: s.tanggal, jam: s.jam, lokasi: s.lokasi, kuota: s.kuota, status: s.status,
+  is_liga: !!s.is_liga, edition_id: s.edition_id || null, liga_match_id: s.liga_match_id || null,
 });
 const mapRsvp = (r: any) => ({
   id: r.id, scheduleId: r.schedule_id, userId: r.user_id,

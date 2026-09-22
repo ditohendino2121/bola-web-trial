@@ -33,15 +33,20 @@ export default function Liga() {
   const editions: any[] = db.editions || [];
   const playerStats: any[] = db.playerStats || [];
   const matches: any[] = db.matches || [];
-  // auto-select latest edition
-  const curEdId = selectedEd || (editions[editions.length-1]?.id || null);
+  // default = Overall (null = gabungan 6 hari), klik tanggal = filter
+  const curEdId: string | null = selectedEd;
   const curMatches = curEdId ? matches.filter((m:any)=>m.edition_id===curEdId) : matches;
 
   // stats helpers
   const kAll = klasemen(matches);
   const kCur = klasemen(curMatches);
-  // top skor from playerStats (new) with fallback to old goals
-  const topFromStats = (() => {
+  // helpers untuk hitung per kEdisi (dipakai bila ada filter)
+  const filterStats = (list:any[]) => curEdId ? list.filter((p:any)=>{
+    const m = matches.find((x:any)=>x.id===p.match_id);
+    return m?.edition_id===curEdId;
+  }) : list;
+  // top skor dari playerStats (baru) — bisa overall atau per edisi
+  const topFromStatsOverall = (() => {
     const map: Record<string, {nama:string, tim:string, gol:number}> = {};
     for (const ps of playerStats) {
       const u = db.users.find((x:any)=>x.id===ps.user_id);
@@ -49,12 +54,34 @@ export default function Liga() {
       if (!map[key]) map[key] = { nama: u?.nama || key, tim: ps.team, gol: 0 };
       map[key].gol += ps.gol || 0;
     }
-    // fallback if no stats yet, use old klasemen topSkor
     if (Object.keys(map).length===0) return topSkor(db);
     return Object.values(map).sort((a,b)=>b.gol-a.gol);
   })();
-  // player stats avg
-  const statsAvg = (() => {
+  const topFromStatsFiltered = (() => {
+    const psFiltered = filterStats(playerStats);
+    if (psFiltered.length===0) {
+      // fallback untuk edisi lama yang masih pakai goals json
+      const c: Record<string, number> = {};
+      curMatches.forEach((m:any)=>(m.goals||[]).forEach((g:any)=>{ c[g.scorerId]=(c[g.scorerId]||0)+1; }));
+      if (Object.keys(c).length===0) return [];
+      return Object.entries(c).map(([id,gol]:any)=>{
+        const u=db.users.find((x:any)=>x.id===id);
+        const tim=Object.entries(db.teams).find(([,arr]:any)=>arr.some((mm:any)=>mm.userId===id))?.[0]||"-";
+        return { nama: u?.nama||id, tim, gol };
+      }).sort((a:any,b:any)=>b.gol-a.gol);
+    }
+    const map: Record<string, {nama:string, tim:string, gol:number}> = {};
+    for (const ps of psFiltered) {
+      const u = db.users.find((x:any)=>x.id===ps.user_id);
+      const key = ps.user_id;
+      if (!map[key]) map[key] = { nama: u?.nama || key, tim: ps.team, gol: 0 };
+      map[key].gol += ps.gol || 0;
+    }
+    return Object.values(map).sort((a,b)=>b.gol-a.gol);
+  })();
+  const topFromStats = curEdId ? topFromStatsFiltered : topFromStatsOverall;
+  // player stats avg — overall vs per edisi
+  const statsAvgOverall = (() => {
     const agg: Record<string, any> = {};
     for (const ps of playerStats) {
       const u = db.users.find((x:any)=>x.id===ps.user_id);
@@ -74,6 +101,28 @@ export default function Liga() {
       avg: a.countNilai ? Math.round((a.totalNilai / a.countNilai)*10)/10 : null,
     })).filter((a:any)=>a.avg!==null).sort((a:any,b:any)=>b.avg-a.avg);
   })();
+  const statsAvgFiltered = (() => {
+    const psFiltered = filterStats(playerStats);
+    const agg: Record<string, any> = {};
+    for (const ps of psFiltered) {
+      const u = db.users.find((x:any)=>x.id===ps.user_id);
+      const key = ps.user_id;
+      if (!agg[key]) agg[key] = { nama: u?.nama||key, team: ps.team, posisi: ps.posisi, main:0, totalNilai:0, totalGol:0, countNilai:0, terbaik:0 };
+      agg[key].main += 1;
+      agg[key].totalGol += ps.gol||0;
+      const final = ps.override ?? ps.nilai_oto;
+      if (final !== null && final !== undefined) {
+        agg[key].totalNilai += Number(final);
+        agg[key].countNilai += 1;
+        agg[key].terbaik = Math.max(agg[key].terbaik, Number(final));
+      }
+    }
+    return Object.values(agg).map((a:any)=> ({
+      ...a,
+      avg: a.countNilai ? Math.round((a.totalNilai / a.countNilai)*10)/10 : null,
+    })).filter((a:any)=>a.avg!==null).sort((a:any,b:any)=>b.avg-a.avg);
+  })();
+  const statsAvg = curEdId ? statsAvgFiltered : statsAvgOverall;
 
   const daftar = () =>
     run(async () => {
@@ -180,6 +229,7 @@ export default function Liga() {
         )}
         {editions.length===0 && <p className="muted">Belum ada edisi. Admin buat edisi pertama.</p>}
         <div className="row">
+          <button className={`btn secondary small`} style={{ borderColor: !curEdId?"var(--gold)":"", background: !curEdId?"var(--gold-soft)":"" }} onClick={()=>setSelectedEd(null)}>🏆 Overall (6 Hari)</button>
           {editions.map((ed:any)=> (
             <button key={ed.id} className={`btn secondary small ${curEdId===ed.id?"":""}`} style={{ borderColor: curEdId===ed.id?"var(--gold)":"" }} onClick={()=>setSelectedEd(ed.id)}>
               {ed.label} • {ed.tanggal}
@@ -190,7 +240,7 @@ export default function Liga() {
       </div>
 
       <div className="card">
-        <h3>📊 Klasemen {curEdId ? "Edisi Ini" : "Overall"}</h3>
+        <h3>📊 Klasemen {curEdId ? `— ${editions.find((e:any)=>e.id===curEdId)?.label || ""}` : "— Overall (6 Hari)"}</h3>
         <div className="tblwrap"><table>
           <thead><tr><th>#</th><th>Tim</th><th>M</th><th>W</th><th>D</th><th>L</th><th>Gol</th><th>+/-</th><th>Poin</th></tr></thead>
           <tbody>{(curEdId?kCur:kAll).map((r: any, i: number) => <tr key={r.tim}><td>{i + 1}</td><td><b>Tim {r.tim}</b></td><td>{r.M}</td><td>{r.W}</td><td>{r.D}</td><td>{r.L}</td><td>{r.GM}-{r.GA}</td><td>{r.GD > 0 ? "+" + r.GD : r.GD}</td><td><b>{r.P}</b></td></tr>)}</tbody>
@@ -199,23 +249,24 @@ export default function Liga() {
       </div>
 
       <div className="card">
-        <h3>👟 Top Skor {curEdId ? "Edisi Ini (dari stats)" : "Overall"}</h3>
+        <h3>👟 Top Skor {curEdId ? `— ${editions.find((e:any)=>e.id===curEdId)?.label || ""}` : "— Overall (6 Hari)"}</h3>
         {topFromStats.length === 0 && <p className="muted">Belum ada gol.</p>}
         {topFromStats.slice(0,10).map((r: any, i: number) => <p key={i}><span className="medal">{medals[i] || "⚽"}</span> <b>{r.nama}</b> (Tim {r.tim}) — <b>{r.gol} gol</b></p>)}
+        <p className="muted"><small>Klik Overall untuk gabungan 6 hari, atau 1 edisi untuk per-tanggal.</small></p>
       </div>
 
       <div className="card">
-        <h3>⭐ Player Stats — Rata-rata Nilai</h3>
-        <p className="muted"><small>Urut tertinggi. Filter posisi:</small></p>
+        <h3>⭐ Player Stats {curEdId ? `— ${editions.find((e:any)=>e.id===curEdId)?.label || ""}` : "— Overall (6 Hari)"}</h3>
+        <p className="muted"><small>Urut tertinggi (rata-rata nilai). Filter posisi: Semua / GK / Belakang / Tengah / Depan — terlihat sama untuk pemain & admin.</small></p>
         <StatsTable stats={statsAvg} />
       </div>
 
       <div className="card">
-        <h3>📅 Pertandingan {curEdId ? "Edisi Ini" : "Semua"} (klik untuk nilai)</h3>
+        <h3>📅 Pertandingan {curEdId ? `— ${editions.find((e:any)=>e.id===curEdId)?.label || ""}` : "— Overall (semua)"} (klik untuk nilai)</h3>
         {(curEdId?curMatches:matches).map((m: any) => (
           <Link key={m.id} href={`/liga/${m.id}`} style={{ textDecoration: "none" }}>
             <div style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid var(--line)" }}>
-              <span><b>Tim {m.home}</b> vs <b>Tim {m.away}</b> <span className={`badge ${m.sh===null?"gray":"green"}`}>{m.sh===null?"belum main":`${m.sh} : ${m.sa}`}</span></span>
+              <span><b>Tim {m.home}</b> vs <b>Tim {m.away}</b> <span className={`badge ${m.sh===null?"gray":"green"}`}>{m.sh===null?"belum main":`${m.sh} : ${m.sa}`}</span>{m.tanggal ? <small className="muted"> • {m.tanggal}</small> : null}</span>
               <span className="badge gold">Detail ➜</span>
             </div>
           </Link>

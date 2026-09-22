@@ -94,7 +94,7 @@ export function fmtBatas(s: Schedule): string {
 
 export function klasemen(matches: Match[]) {
   const t: Record<string, { M: number; W: number; D: number; L: number; GM: number; GA: number; P: number }> = {};
-  ["A", "B", "C", "D"].forEach((k) => (t[k] = { M: 0, W: 0, D: 0, L: 0, GM: 0, GA: 0, P: 0 }));
+  TEAM_CODES.forEach((k) => (t[k] = { M: 0, W: 0, D: 0, L: 0, GM: 0, GA: 0, P: 0 }));
   matches.forEach((m) => {
     if (m.sh === null || m.sa === null) return;
     t[m.home].M++; t[m.away].M++;
@@ -120,6 +120,16 @@ export function topSkor(db: DB) {
     })
     .sort((a, b) => b.gol - a.gol);
 }
+
+export const TEAM_CODES = ["A","B","C","D"] as const;
+export const TEAM_DISPLAY: Record<string,string> = {
+  A: "Panadol Medika FC",
+  B: "Mubacetamol FC",
+  C: "Ibuprofen FC",
+  D: "DnA Amoxilin FC",
+};
+export const TEAM_SHORT: Record<string,string> = { A:"PAN", B:"MUB", C:"IBU", D:"DNA" };
+export function teamNama(kode: string) { return TEAM_DISPLAY[kode] || kode; }
 
 export const QUOTA_POSISI: Record<string, number> = { GK: 1, Belakang: 2, Tengah: 2, Depan: 2 };
 export const QUOTA_MAIN: Record<PosisiMain, number> = { GK: 4, Belakang: 8, Tengah: 8, Depan: 8 };

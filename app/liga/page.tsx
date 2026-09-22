@@ -83,11 +83,97 @@ export default function LigaRegistrasi() {
   };
 
   const keluarkan = (t: string, userId: string) => {
-    if (!confirm("Keluarkan pemain ini dari tim? (untuk pergantian)")) return;
-    run(async () => {
-      const { error } = await supa().from("league_members").delete().eq("team", t).eq("user_id", userId);
-      if (error) throw new Error(error.message);
-    });
+    const targetNama = db.users.find((u:any)=>u.id===userId)?.nama || userId;
+    const lockedNow = !!db.leagueLocked;
+    // cari RSVP edisi mendatang yang terkait user ini (untuk refund/gugur)
+    const futureRsvps = db.schedules
+      .filter((s:any)=> s.is_liga && s.edition_id)
+      .filter((s:any)=>{
+        const ed = db.editions.find((e:any)=> e.id===s.edition_id);
+        if (!ed) return false;
+        const isFuture = ed.tanggal >= new Date().toISOString().slice(0,10); // edisi mendatang
+        if (!isFuture) return false;
+        return db.rsvps.some((r:any)=> r.scheduleId===s.id && r.userId===userId && r.status!=="cancelled");
+      })
+      .map((s:any)=> db.rsvps.find((r:any)=> r.scheduleId===s.id && r.userId===userId && r.status!=="cancelled"))
+      .filter(Boolean) as any[];
+
+    const hasFinancial = futureRsvps.length>0;
+    const preview = hasFinancial ? futureRsvps.map((r:any)=>{
+      const s = db.schedules.find((x:any)=>x.id===r.scheduleId);
+      const ed = db.editions.find((e:any)=>e.id===s?.edition_id);
+      const tag = r.status==="confirmed_lunas" ? "lunas 1 kredit" : r.status==="confirmed_langsung" ? "cash di tempat" : r.status==="wajib_bayar" ? "hutang" : r.status;
+      return `• ${ed?.label||s?.tanggal} — ${tag}`;
+    }).join("\n") : "";
+
+    if (!lockedNow) {
+      // sebelum lock: otomatis refund/gugur
+      const msg = hasFinancial
+        ? `Keluarkan ${targetNama} dari ${teamNama(t)}?\nKredit/hutang edisi mendatang akan otomatis dikembalikan/digugurkan:\n${preview}\nLanjut?`
+        : `Keluarkan ${targetNama} dari ${teamNama(t)}?`;
+      if (!confirm(msg)) return;
+      run(async () => {
+        for (const r of futureRsvps) {
+          const s = db.schedules.find((x:any)=>x.id===r.scheduleId);
+          if (!s) continue;
+          if (r.status==="confirmed_lunas" && r.metode==="deposit") {
+            const w = db.wallets[userId] || { paket:0, reguler:0, paket_gk:0, reguler_gk:0 };
+            const isGk = !!r.pakai_gk;
+            const patch = isGk ? { reguler_gk: w.reguler_gk + 1 } : { reguler: w.reguler + 1 };
+            // pakai w yang lama, tapi upsert dengan increment
+            await supa().from("wallets").upsert({ user_id: userId, paket: w.paket, reguler: w.reguler, paket_gk: w.paket_gk, reguler_gk: w.reguler_gk, ...patch });
+            await supa().from("rsvps").update({ status: "cancelled" }).eq("id", r.id);
+            await supa().from("txs").insert({ user_id: userId, label: `Refund edisi ${s.tanggal} — dikeluarkan sebelum lock`, metode: "refund_edisi", status: "success" });
+          } else if (r.status==="wajib_bayar" || r.status==="confirmed_langsung") {
+            await supa().from("rsvps").update({ status: "cancelled" }).eq("id", r.id);
+            // hutang gugur
+            await supa().from("txs").insert({ user_id: userId, label: `Hutang edisi ${s.tanggal} gugur — dikeluarkan sebelum lock`, metode: "void", status: "success" });
+          } else {
+            await supa().from("rsvps").update({ status: "cancelled" }).eq("id", r.id);
+          }
+        }
+        const { error } = await supa().from("league_members").delete().eq("team", t).eq("user_id", userId);
+        if (error) throw new Error(error.message);
+      });
+      return;
+    }
+
+    // setelah lock: tanya Ya/Tidak
+    if (!confirm(`Keluarkan ${targetNama} dari ${teamNama(t)}?\nIni punishment ghosting (squad sudah dikunci).`)) return;
+    if (hasFinancial) {
+      const ask = confirm(`Pemain ini punya pembayaran edisi mendatang:\n${preview}\n\nApakah kredit dikembalikan / hutang dihapus?\nOK = Ya, kembalikan/hapus\nCancel = Tidak, tetap (punishment)`);
+      const doRefund = ask;
+      run(async () => {
+        if (doRefund) {
+          for (const r of futureRsvps) {
+            const s = db.schedules.find((x:any)=>x.id===r.scheduleId);
+            if (!s) continue;
+            if (r.status==="confirmed_lunas" && r.metode==="deposit") {
+              const w = db.wallets[userId] || { paket:0, reguler:0, paket_gk:0, reguler_gk:0 };
+              const isGk = !!r.pakai_gk;
+              const patch = isGk ? { reguler_gk: w.reguler_gk + 1 } : { reguler: w.reguler + 1 };
+              await supa().from("wallets").upsert({ user_id: userId, paket: w.paket, reguler: w.reguler, paket_gk: w.paket_gk, reguler_gk: w.reguler_gk, ...patch });
+              await supa().from("rsvps").update({ status: "cancelled" }).eq("id", r.id);
+              await supa().from("txs").insert({ user_id: userId, label: `Refund edisi ${s.tanggal} — dikeluarkan (Ya, kembalikan)`, metode: "refund_edisi", status: "success" });
+            } else if (r.status==="wajib_bayar") {
+              await supa().from("rsvps").update({ status: "cancelled" }).eq("id", r.id);
+              await supa().from("txs").insert({ user_id: userId, label: `Hutang edisi ${s.tanggal} dihapus — dikeluarkan (Ya)`, metode: "void", status: "success" });
+            } else if (r.status==="confirmed_langsung") {
+              await supa().from("rsvps").update({ status: "cancelled" }).eq("id", r.id);
+            }
+          }
+        } else {
+          // Tidak: biarkan kredit/hutang tetap, hanya keluarkan dari tim. RSVP mendatang dibiarkan (tetap hutang/lunas) — jadi punishment finansial tetap
+        }
+        const { error } = await supa().from("league_members").delete().eq("team", t).eq("user_id", userId);
+        if (error) throw new Error(error.message);
+      });
+    } else {
+      run(async () => {
+        const { error } = await supa().from("league_members").delete().eq("team", t).eq("user_id", userId);
+        if (error) throw new Error(error.message);
+      });
+    }
   };
 
   const pesertaSudahDaftar = me ? (["A","B","C","D"].some(t=> (db.teams[t]||[]).some((m:any)=>m.userId===me.id))) : false;

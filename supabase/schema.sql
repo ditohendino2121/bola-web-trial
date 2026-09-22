@@ -82,6 +82,8 @@ create table if not exists public.rsvps (
   posisi text not null default 'Depan' check (posisi in ('GK','Belakang','Tengah','Depan')),
   metode text not null default 'langsung' check (metode in ('deposit','utang','langsung')),
   pakai_gk boolean not null default false,
+  is_alihan boolean not null default false,
+  alih_dari uuid references public.profiles(id),
   created_at timestamptz not null default now()
 );
 create index if not exists idx_rsvps_schedule on public.rsvps (schedule_id);

@@ -15,7 +15,7 @@ const mapSchedule = (s: any) => ({
 });
 const mapRsvp = (r: any) => ({
   id: r.id, scheduleId: r.schedule_id, userId: r.user_id,
-  status: r.status, posisi: r.posisi, metode: r.metode, pakaiGk: !!r.pakai_gk,
+  status: r.status, posisi: r.posisi, metode: r.metode, pakaiGk: !!r.pakai_gk, is_alihan: !!r.is_alihan, alih_dari: r.alih_dari,
 });
 const mapTx = (t: any) => ({
   id: t.id, userId: t.user_id, label: t.label,
@@ -126,6 +126,13 @@ export async function batalRsvp(scheduleId: string) {
 }
 
 // ---------- klaim top-up ----------
+export async function alihSlot(rsvpId: string, penggantiId: string) {
+  const { data, error } = await supa().rpc("rpc_alih_slot", { p_rsvp_id: rsvpId, p_pengganti: penggantiId });
+  if (error) throw new Error(error.message);
+  const r = data as any;
+  if (!r?.ok) throw new Error(r?.msg || "Gagal alih slot");
+}
+
 export async function kirimKlaim(userId: string, paket: "1x" | "4x", metode: string, rupiah: number, bukti: string, catatan: string, isGK = false) {
   const { error } = await supa().from("txs").insert({
     user_id: userId,

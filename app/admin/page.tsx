@@ -22,6 +22,8 @@ export default function Admin() {
   const [walkinCara, setWalkinCara] = useState<"potong" | "cash">("potong");
   const [manualText, setManualText] = useState("");
   const manualLabel = (u: any) => `${u.nama} (${u.wa})`;
+  const [alihText, setAlihText] = useState("");
+  const [alihPickAlih, setAlihPickAlih] = useState("");
   const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
   useEffect(() => { reload(); }, []);
   if (err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
@@ -335,6 +337,7 @@ export default function Admin() {
                         <span className={`badge ${r.status === "confirmed_lunas" ? "green" : r.status === "confirmed_langsung" ? "blue" : r.status === "no_show" ? "gray" : "red"}`}>
                           {r.status === "confirmed_lunas" ? "✅ Lunas" : r.status === "confirmed_langsung" ? "💵 Di tempat" : r.status === "no_show" ? "🚫 No-show" : r.status === "wajib_bayar" ? "🔒 Wajib bayar" : "⏳ Utang"}
                         </span>
+                        {r.is_alihan && <span className="badge yellow" style={{ marginLeft: 6 }}>🔄 Alihan</span>}
                       </div>
                       {(r.status === "confirmed_langsung" || r.status === "confirmed_utang" || r.status === "wajib_bayar") && (
                         <>
@@ -344,12 +347,42 @@ export default function Admin() {
                         </>
                       )}
                       {r.status === "confirmed_lunas" && <button className="btn secondary small" disabled={busy} onClick={() => checkin(r.id, "nodatang")}>Tidak datang</button>}
+                      {r.is_alihan && r.alih_dari && <small className="muted" style={{ marginLeft: 6 }}>dari {namaOf(r.alih_dari)}</small>}
                     </div>
                   ))}
                   {arr.length === 0 && <p className="muted"><small>— kosong —</small></p>}
                 </div>
               );
             })}
+            <div className="card" style={{ background: "#211a08", borderColor: "var(--gold-deep)" }}>
+              <h4>🔄 Alih Slot (admin gantikan pemain)</h4>
+              <p className="muted"><small>Pemain out hubungi admin → admin pilih slot & pengganti (posisi sama, maks 1x oper, deposit hangus privat).</small></p>
+              <select value={alihText} onChange={(e) => { setAlihText(e.target.value); setAlihPickAlih(""); }} style={{ marginBottom: 6 }}>
+                <option value="">— Pilih slot yang mau dialihkan —</option>
+                {roster.filter((r: any) => (r.status === "confirmed_lunas" || r.status === "confirmed_langsung") && !r.is_alihan).map((r: any) => (
+                  <option key={r.id} value={r.id}>{namaOf(r.userId)} — {r.posisi} • {r.status === "confirmed_lunas" ? "Lunas" : "Di tempat"}</option>
+                ))}
+              </select>
+              {alihText && (
+                <select value={alihPickAlih} onChange={(e) => setAlihPickAlih(e.target.value)} style={{ marginBottom: 6 }}>
+                  <option value="">— Pilih pengganti —</option>
+                  {db.users.filter((u: any) => u.status === "approved" && !roster.some((x: any) => x.userId === u.id)).map((u: any) => (
+                    <option key={u.id} value={u.id}>{u.nama} ({u.wa})</option>
+                  ))}
+                </select>
+              )}
+              <button className="btn" disabled={busy || !alihText || !alihPickAlih} onClick={async () => {
+                const rId = alihText; const gId = alihPickAlih;
+                if (!rId || !gId) return;
+                const r = roster.find((x: any) => x.id === rId);
+                const hasil = await supa().rpc("rpc_alih_slot", { p_rsvp_id: rId, p_pengganti: gId });
+                if (hasil.error) return alert(hasil.error.message);
+                const d: any = hasil.data;
+                if (!d?.ok) return alert(d?.msg || "Gagal alih");
+                await reload();
+                setAlihText(""); setAlihPickAlih("");
+              }}>Alihkan Slot ➜</button>
+            </div>
             <div className="row" style={{ marginTop: 8 }}>
               <button className="btn secondary small" onClick={salinWA}>📋 Salin ke WA</button>
               <button className="btn secondary small" onClick={() => exportJadwal(false)}>⬇️ CSV Jadwal</button>

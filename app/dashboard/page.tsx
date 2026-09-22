@@ -42,7 +42,14 @@ export default function Dashboard() {
             : r.status === "confirmed_langsung" ? <span className="badge blue">💵 Di tempat</span>
             : r.status === "no_show" ? <span className="badge gray">🚫 No-show</span>
             : <span className="badge red">🔒 Wajib bayar</span>;
-          return <p key={r.id}>📅 <b>{s?.tanggal}</b> {s?.jam} • <span className="badge gray">{r.posisi || ""}</span> {badge}</p>;
+          return (
+            <div key={r.id} style={{ borderBottom: "1px solid var(--line)", padding: "8px 0" }}>
+              <p style={{ margin: "2px 0" }}>📅 <b>{s?.tanggal}</b> {s?.jam} • <span className="badge gray">{r.posisi || ""}</span> {badge} {r.is_alihan && <span className="badge yellow">🔄 Alihan</span>}</p>
+              {(r.status === "confirmed_lunas" || r.status === "confirmed_langsung") && !r.is_alihan && (
+                <p className="muted" style={{ margin: "2px 0" }}><small>Butuh pengganti? Hubungi admin — admin yang akan alihkan slotmu. Deposit hangus, urusan ganti privat.</small></p>
+              )}
+            </div>
+          );
         })}
       </div>
       <button className="btn secondary small" onClick={() => signOut().then(reload)}>Logout</button>

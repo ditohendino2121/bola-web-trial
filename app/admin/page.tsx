@@ -89,7 +89,10 @@ export default function Admin() {
 
   const kurangiKredit = async (userId: string, kind: "paket" | "reguler" | "paket_gk" | "reguler_gk") => {
     const w = walletOf(db, userId);
-    if ((w[kind] || 0) < 1) return alert("Kreditnya sudah 0");
+    if ((w[kind] || 0) < 1) {
+      const labelMap: any = { paket: "Paket (P)", reguler: "Reguler (R)", paket_gk: "Paket GK (PGK)", reguler_gk: "Reguler GK (RGK)" };
+      return alert(`${labelMap[kind]} sudah 0 — tidak bisa dikurangi.\nSisa: P${w.paket} / R${w.reguler} / PGK${w.paket_gk} / RGK${w.reguler_gk}\nPakai tombol yang kantongnya masih ada.`);
+    }
     const alasan = prompt(`Kurangi 1 kredit ${kind} untuk ${namaOf(userId)}?\nIsi alasan (cth: walk-in tanpa list, koreksi):`);
     if (alasan === null) return;
     await run(async () => {
@@ -441,7 +444,7 @@ export default function Admin() {
             <div className="card" style={{ background: "#211a08", borderColor: "var(--gold-deep)" }}>
               <div className="section-title">
                 <div><b style={{ fontSize: 18 }}>{u.nama}</b> {u.is_member && <span className="badge yellow">⭐ Member</span>}<br />
-                <small className="muted">{u.wa} • P{w.paket} / R{w.reguler} / GK {w.paket_gk + w.reguler_gk}</small></div>
+                <small className="muted">{u.wa} • P{w.paket} / R{w.reguler} / PGK{w.paket_gk} / RGK{w.reguler_gk}</small></div>
                 <button className="btn secondary small" onClick={() => setManualText("")}>✖ Ganti</button>
               </div>
               <div className="row" style={{ marginTop: 8 }}>
@@ -453,6 +456,7 @@ export default function Admin() {
               <div className="row" style={{ marginTop: 6 }}>
                 <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler")}>−1 R</button>
                 <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "paket")}>−1 P</button>
+                <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "paket_gk")}>−1 PGK</button>
                 <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler_gk")}>−1 RGK</button>
                 <button className="btn secondary small" disabled={busy} onClick={() => toggleMember(u.id)}>{u.is_member ? "Cabut ⭐" : "Jadi ⭐"}</button>
               </div>

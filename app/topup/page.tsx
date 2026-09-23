@@ -38,6 +38,9 @@ export default function Topup() {
   };
 
   const mine = db.txs.filter((t: any) =>t.userId === me.id).slice().reverse();
+  const salin = async (teks: string, label: string) => {
+    try { await navigator.clipboard.writeText(teks); alert(`${label} tersalin`); } catch { prompt(`Copy ${label}:`, teks); }
+  };
 
   return (
     <div>
@@ -70,14 +73,41 @@ export default function Topup() {
           <option value="transfer">Transfer bank</option>
           <option value="cash">Cash (titip / di lapangan)</option>
         </select>
-        {metode === "qris" && <div className="banner info">📱 Bayar ke QRIS komunitas nominal pas Rp{harga.toLocaleString("id-ID")}, lalu konfirmasi di bawah. (Detail QRIS tanya admin di menu Kontak.)</div>}
-        {metode === "transfer" && <div className="banner info">🏦 Transfer nominal pas Rp{harga.toLocaleString("id-ID")}, lalu konfirmasi di bawah. (No. rekening tanya admin di menu Kontak.)</div>}
+        {metode === "qris" && (
+          <div className="card" style={{ background: "#141416", borderColor: "var(--line)", marginTop: 8, textAlign: "center" }}>
+            <p style={{ margin: "0 0 6px", fontWeight: 800, fontSize: 14, color: "#fff" }}>Scan QRIS MUBA SPORT OFFICIAL</p>
+            <p className="muted" style={{ fontSize: 12, margin: "0 0 8px" }}>Nominal pas <b style={{ color: "#fff" }}>Rp{harga.toLocaleString("id-ID")}</b> — {paket} {isGK ? "(GK)" : ""}</p>
+            <a href="/qris-muba.jpg" target="_blank" rel="noreferrer"><img src="/qris-muba.jpg" alt="QRIS MUBA SPORT OFFICIAL NMID ID1026573397951" style={{ width: 280, maxWidth: "100%", borderRadius: 16, border: "1px solid var(--line)", display: "block", margin: "0 auto" }} /></a>
+            <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>MUBA SPORT OFFICIAL • NMID: ID1026573397951 • bukupay</p>
+            <div className="row" style={{ justifyContent: "center", marginTop: 6 }}>
+              <button className="btn secondary small" onClick={()=> salin("ID1026573397951", "NMID")}>Salin NMID</button>
+              <button className="btn secondary small" onClick={()=> salin(String(harga), "Nominal")}>Salin Nominal</button>
+            </div>
+            <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>Transfer via QRIS tidak perlu isi berita. Setelah scan, konfirmasi di bawah.</p>
+          </div>
+        )}
+        {metode === "transfer" && (
+          <div className="card" style={{ background: "#141416", borderColor: "var(--line)", marginTop: 8 }}>
+            <p style={{ margin: "0 0 4px", fontWeight: 800, color: "#fff" }}>Transfer Bank</p>
+            <div style={{ background: "#0F0F10", border: "1px solid var(--line)", borderRadius: 12, padding: 12, marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>Bank</div><div style={{ fontWeight: 800, color: "#fff" }}>BCA Syariah</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>No. Rekening</div><div style={{ fontWeight: 800, color: "#fff", fontSize: 18, letterSpacing: 0.02, wordBreak: "break-all" }}>036.000.7496</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>a.n</div><div style={{ fontWeight: 800, color: "#fff" }}>Muhamad Ali Sodiqin</div>
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line)", fontSize: 13 }}><span className="muted">Nominal pas:</span> <b style={{ color: "var(--gold)" }}>Rp{harga.toLocaleString("id-ID")}</b> <span className="badge gold" style={{ marginLeft: 6 }}>{paket} {isGK ? "(GK)" : ""}</span></div>
+            </div>
+            <div className="row" style={{ marginTop: 8 }}>
+              <button className="btn secondary small" onClick={()=> salin("0360007496", "No. Rek")}>Salin No. Rek</button>
+              <button className="btn secondary small" onClick={()=> salin(String(harga), "Nominal")}>Salin Nominal</button>
+            </div>
+            <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>Pakai angka tanpa titik saat paste di m-banking. Setelah transfer, konfirmasi di bawah.</p>
+          </div>
+        )}
         {metode === "cash" && <div className="banner warn">Cash: bayar langsung ke admin di lapangan. Admin bisa input tanpa klaim — tapi boleh juga kirim konfirmasi ini.</div>}
         {(metode === "qris" || metode === "transfer") && (
           <input placeholder="Info bukti, cth: 'BCA 14.32 Budi'" value={bukti} onChange={(e) =>setBukti(e.target.value)} />
         )}
         <input placeholder="Catatan (opsional), cth: titip ke Andi" value={catatan} onChange={(e) =>setCatatan(e.target.value)} />
-        <button className="btn" disabled={busy} onClick={kirim}>Kirim Konfirmasi ke Admin ➜</button>
+        <button className="btn" disabled={busy} onClick={kirim}>Kirim Konfirmasi ke Admin</button>
       </div>
 
       <div className="card">

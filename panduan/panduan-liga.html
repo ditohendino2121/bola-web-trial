@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Panduan Liga — MUBA FC</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; font-size: 11.5pt; line-height: 1.6; margin: 0; }
+  .cover { background: #0e0e10; color: #f5f1e6; border-radius: 14px; padding: 44px 38px; text-align: center; page-break-after: always; }
+  .cover img { width: 165px; height: 165px; object-fit: cover; border-radius: 50%; border: 4px solid #d4af37; }
+  .cover h1 { color: #d4af37; font-size: 29pt; margin: 16px 0 4px; letter-spacing: 2px; }
+  .cover h2 { font-size: 14pt; font-weight: 400; margin: 0 0 6px; color: #e7dfc8; }
+  .cover .tag { display: inline-block; border: 1px solid #d4af37; border-radius: 999px; padding: 6px 22px; margin-top: 16px; font-weight: 700; color: #d4af37; }
+  .cover p.addr { color: #a8a29e; font-size: 10pt; margin-top: 22px; }
+  h2.ch { color: #111; border-bottom: 3px solid #d4af37; padding-bottom: 4px; font-size: 15pt; margin-top: 30px; }
+  h3 { font-size: 12.5pt; margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10.5pt; }
+  th { background: #111; color: #d4af37; text-align: left; }
+  th, td { border: 1px solid #ccc; padding: 7px 9px; vertical-align: top; }
+  tr:nth-child(even) td { background: #faf7ef; }
+  .box { border-left: 5px solid #d4af37; background: #faf7ef; padding: 10px 14px; border-radius: 0 10px 10px 0; margin: 12px 0; }
+  .box.red { border-color: #b91c1c; background: #fef2f2; }
+  .toc a { color: #111; text-decoration: none; }
+  .toc li { margin-bottom: 3px; }
+  .foot { margin-top: 26px; border-top: 2px solid #d4af37; padding-top: 8px; font-size: 10pt; color: #555; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <img src="../public/logo-muba.jpg" alt="Logo MUBA FC">
+  <h1>MUBA FC</h1>
+  <h2>Masjid Utsman Bin Affan</h2>
+  <h2 style="font-size:13pt">🏆 Panduan Liga — MUBA League KIM x DnA</h2>
+  <div class="tag">LIGA 6 HARI</div>
+  <p class="addr">🌐 https://muba-fc.vercel.app → Registrasi & Klasemen KIM x DnA Health League<br>📍 Tarasso Coffee, Jl. Adam Malik No. 58, Kreo Selatan, Larangan, Tangerang<br>Edisi September 2026</p>
+</div>
+
+<h2 class="ch">Daftar Isi</h2>
+<ol class="toc">
+  <li><a href="#l1">1. Konsep Liga</a></li>
+  <li><a href="#l2">2. Registrasi: Pool & Kocok</a></li>
+  <li><a href="#l3">3. Edisi & Jadwal Bayar (1 edisi = 1 kredit)</a></li>
+  <li><a href="#l4">4. Bayar Edisi & Finalisasi H-day</a></li>
+  <li><a href="#l5">5. Keluarkan & Pengganti Per Edisi</a></li>
+  <li><a href="#l6">6. Skor & Rubrik Penilaian v1</a></li>
+  <li><a href="#l7">7. Klasemen, Top Skor & Player Stats</a></li>
+  <li><a href="#l8">8. FAQ Liga</a></li>
+</ol>
+
+<h2 class="ch" id="l1">1. Konsep Liga</h2>
+<p>MUBA League KIM x DnA: 6 hari (edisi), 4 tim @7 orang (GK1/Belakang2/Tengah2/Depan2, total 28). Tiap edisi 6 laga round-robin, tiap tim main 3x per edisi. Bayar per edisi (1 kredit / 25rb / GK 15rb). Panel Registrasi untuk daftar & bayar; Klasemen untuk pantau.</p>
+<p>Tim: Panadol Medika FC, Mubacetamol FC, Ibuprofen FC, DnA Amoxilin FC.</p>
+
+<h2 class="ch" id="l2">2. Registrasi: Pool & Kocok</h2>
+<ol>
+  <li>Buka <b>Registrasi KIM x DnA Health League</b> → pilih posisi → Gabung Pool (kuota GK4/Belakang8/Tengah8/Depan8, penuh = terkunci).</li>
+  <li>Admin <b>Kocok Jadi 4 Tim</b> → dealing ber-cap (GK1/tim), tidak mungkin 2 GK 1 tim. Boleh pool pincang (lapor kekurangan). Kocok Ulang bebas sebelum lock.</li>
+  <li>Pool kosong + 4 tim 7 orang → tombol <b>Kunci Skuad</b> aktif. Setelah lock, kocok hilang, hanya ubah manual/Keluarkan (Ya/Tidak refund).</li>
+  <li>Pemain sudah terdaftar langsung lihat jadwal edisi di bawah pool.</li>
+</ol>
+
+<h2 class="ch" id="l3">3. Edisi & Jadwal Bayar (1 edisi = 1 kredit)</h2>
+<p>Admin buat edisi: tanggal + label → 6 laga + 1 jadwal bayar edisi (is_liga, kuota 28). Maks 6 edisi. Hapus edisi menghapus 6 laga & jadwalnya (stats ikut hilang). Jadwal edisi muncul di Registrasi (scroll).</p>
+
+<h2 class="ch" id="l4">4. Bayar Edisi & Finalisasi H-day</h2>
+<ul>
+  <li>Peserta skuad pilih edisi → 2 tombol: <b>✅ Potong 1 Kredit (posisi terkunci)</b> / <b>💵 Cash</b>. Bukan skuad tidak ada tombol.</li>
+  <li>Tidak konfirmasi sampai finalisasi = <b>dianggap ikut</b>. Admin di Registrasi → Finalisasi: <b>Hadir-Potong / Hadir-Cash / Keluarkan</b> per nama yang belum konfirmasi.</li>
+  <li>H-2 tidak berlaku untuk liga (diganti lock). Batal sebelum finalisasi: kredit kembali. Setelah finalisasi/hari H: hutang.</li>
+  <li>Belum bayar = hutang edisi + kunci list FUN & edisi berikutnya.</li>
+</ul>
+
+<h2 class="ch" id="l5">5. Keluarkan & Pengganti Per Edisi</h2>
+<table>
+  <tr><th>Kondisi</th><th>Efek</th></tr>
+  <tr><td>Sebelum lock</td><td>Otomatis refund 1 kredit edisi mendatang + gugur hutang</td></tr>
+  <tr><td>Setelah lock: pilih <b>Ya</b></td><td>Refund/gugur edisi mendatang (yang sudah dimainkan tetap)</td></tr>
+  <tr><td>Setelah lock: pilih <b>Tidak</b></td><td>Tetap (punishment), tidak refund/tidak hapus hutang</td></tr>
+</table>
+<p>Edisi yang sudah dimainkan tidak tersentuh. Pengganti per edisi, admin-only, via tambah manual (off-web ganti uang privat antar pemain).</p>
+
+<h2 class="ch" id="l6">6. Skor & Rubrik Penilaian v1</h2>
+<p>Detail laga di <b>/liga/[matchId]</b> (klik dari Klasemen):</p>
+<ul>
+  <li>Tab Skor: input skor home/away (admin).</li>
+  <li>Tab Penilaian: tabel lineup (Gol, Assist, Aksi kunci, Shot on Target, Kartu, Blunder) → <b>nilai oto live</b> base 6.0 + gol (GK0.5/Belakang1.0/Tengah1.0/Depan1.2) + assist0.5 + aksi (GK save0.4 max2.0 / Belakang tekel0.4 max2.0+SoT0.2 max1.0 / Tengah tekel0.2 max1.0+SoT0.2 max1.0 / Depan SoT0.2 max1.0) + clean sheet (GK1.5/Belakang1.0/Tengah0.5) − kebobolan (GK0.3 max1.5/Belakang0.2 max1.0) − kartu0.5/1.5 − blunder max1.0 → clamp 3–10, 1 desimal. Override ±0.5 wajib catatan.</li>
+  <li>Validasi: total gol tim harus = skor.</li>
+</ul>
+
+<h2 class="ch" id="l7">7. Klasemen, Top Skor & Player Stats</h2>
+<p>Buka <b>Klasemen KIM x DnA Health League</b>: daftar 4 tim + pemain, filter <b>Overall / per edisi</b> (tanpa detail laga di Overall, hanya di per-edisi). Tabel Top Skor & Player Stats scroll (max 320px) biar rapi. Klasemen: P3/S1, urut Poin → Selisih → Gol. Player Stats: avg nilai (terbaik), filter posisi.</p>
+
+<h2 class="ch" id="l8">8. FAQ Liga</h2>
+<table>
+  <tr><th>Q</th><th>A</th></tr>
+  <tr><td>Pool penuh?</td><td>Posisi itu terkunci, daftar posisi lain.</td></tr>
+  <tr><td>Sudah daftar tapi mau ganti posisi?</td><td>Hubungi admin sebelum kocok — admin keluarkan + daftar ulang.</td></tr>
+  <tr><td>Kocok pincang?</td><td>Boleh, lapor kekurangan, lengkapi manual sebelum lock.</td></tr>
+</table>
+
+<div class="foot">
+  <b>MUBA FC • Masjid Utsman Bin Affan</b> — Panduan Liga • 🌐 https://muba-fc.vercel.app • Tarasso Coffee • Abu Faqih 081281186360 • Irfan 081395771559
+</div>
+</body>
+</html>

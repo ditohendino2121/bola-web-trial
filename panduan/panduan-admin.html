@@ -24,12 +24,10 @@
   .box.green { border-color: #15803d; background: #f0fdf4; }
   .box b.t { display: block; margin-bottom: 2px; }
   ol.steps li, ul li { margin-bottom: 5px; }
-  code { background: #eee; padding: 1px 6px; border-radius: 5px; font-size: 10pt; }
   .toc a { color: #111; text-decoration: none; }
   .toc li { margin-bottom: 3px; }
   .foot { margin-top: 26px; border-top: 2px solid #d4af37; padding-top: 8px; font-size: 10pt; color: #555; }
   .pagebreak { page-break-before: always; }
-  .kbd { display:inline-block; border:1px solid #999; border-bottom-width:2px; border-radius:5px; padding:0 7px; font-size:10pt; background:#f7f7f7; }
 </style>
 </head>
 <body>
@@ -38,179 +36,79 @@
   <img src="../public/logo-muba.jpg" alt="Logo MUBA FC">
   <h1>MUBA FC</h1>
   <h2>Masjid Utsman Bin Affan</h2>
-  <h2 style="font-size:13pt">📘 Panduan Admin Web MUBA FC</h2>
+  <h2 style="font-size:13pt">📘 Panduan Admin</h2>
   <div class="tag">UNTUK PENGURUS</div>
-  <p class="addr">🌐 https://muba-fc.vercel.app<br>📍 Basecamp: Tarasso Coffee, Jl. Adam Malik No. 58, Kreo Selatan, Larangan, Tangerang<br>Edisi September 2026</p>
+  <p class="addr">🌐 https://muba-fc.vercel.app<br>📍 Tarasso Coffee, Jl. Adam Malik No. 58, Kreo Selatan, Larangan, Tangerang<br>Edisi September 2026</p>
 </div>
 
 <h2 class="ch">Daftar Isi</h2>
 <ol class="toc">
-  <li><a href="#c1">1. Pengenalan & Peran Admin</a></li>
-  <li><a href="#c2">2. Login Admin</a></li>
-  <li><a href="#c3">3. Approve Pendaftar Baru</a></li>
-  <li><a href="#c4">4. Kelola Jadwal Main</a></li>
-  <li><a href="#c5">5. Roster per Tanggal & Check-in Lapangan</a></li>
-  <li><a href="#c6">6. Walk-in: Datang Tanpa Isi List</a></li>
-  <li><a href="#c7">7. Verifikasi Pembayaran (QRIS/Transfer)</a></li>
-  <li><a href="#c8">8. Kredit Manual: Cash, Bantuan & Koreksi</a></li>
-  <li><a href="#c9">9. Hapus Data Salah Input</a></li>
-  <li><a href="#c10">10. Member, Harga GK & Aturan Sistem</a></li>
-  <li><a href="#c11">11. Keuangan: Kas Awal, Pengeluaran, Sponsor</a></li>
-  <li><a href="#c12">12. Laporan Laba Rugi & Arus Kas (PDF)</a></li>
-  <li><a href="#c13">13. Kelola Liga 6 Bulan</a></li>
-  <li><a href="#c14">14. Export Data & Acak Tim</a></li>
-  <li><a href="#c15">15. FAQ & Troubleshooting</a></li>
+  <li><a href="#c1">1. Peran Admin</a></li>
+  <li><a href="#c2">2. Login & Keamanan</a></li>
+  <li><a href="#c3">3. Approve Pendaftar</a></li>
+  <li><a href="#c4">4. Kelola Jadwal FUN</a></li>
+  <li><a href="#c5">5. Roster, Check-in & Radar Tunggakan</a></li>
+  <li><a href="#c6">6. Walk-in & Alih Slot</a></li>
+  <li><a href="#c7">7. Verifikasi Pembayaran</a></li>
+  <li><a href="#c8">8. Kredit Manual & Bantuan</a></li>
+  <li><a href="#c9">9. Hapus & Koreksi</a></li>
+  <li><a href="#c10">10. Keuangan & Laporan</a></li>
+  <li><a href="#c11">11. Akad</a></li>
+  <li><a href="#c12">12. FAQ Troubleshooting</a></li>
 </ol>
 
-<h2 class="ch" id="c1">1. Pengenalan & Peran Admin</h2>
-<p>Web MUBA FC di <b>https://muba-fc.vercel.app</b> menggantikan list WhatsApp dan catatan manual. Datanya online dan sinkron antar HP. Tugas admin:</p>
-<ul>
-  <li>Menyetujui pendaftar baru agar orang luar tidak masuk sembarangan.</li>
-  <li>Membuat jadwal main dan mengatur statusnya.</li>
-  <li>Check-in pemain di lapangan dan mencatat pembayaran cash.</li>
-  <li>Memverifikasi klaim pembayaran dan mengelola kredit pemain.</li>
-  <li>Mencatat kas awal, pengeluaran, sponsor, dan mengunduh laporan keuangan.</li>
-  <li>Mengelola liga 6 bulan.</li>
-</ul>
-<div class="box"><b class="t">📌 Prinsip penting</b>Sistem yang menagih, bukan admin yang sungkan menagih. Aturan H-2, tunggakan, dan blokir otomatis ditegakkan web — admin hanya menangani pengecualian.</div>
+<h2 class="ch" id="c1">1. Peran Admin</h2>
+<p>Mengelola pendaftaran, jadwal, pembayaran, roster H-day, keuangan, dan liga. Semua tindakan tercatat di Kas.</p>
 
-<h2 class="ch" id="c2">2. Login Admin</h2>
+<h2 class="ch" id="c2">2. Login & Keamanan</h2>
 <ol class="steps">
-  <li>Buka https://muba-fc.vercel.app di HP.</li>
-  <li>Beranda → <b>Sudah punya akun → Masuk</b> dengan <b>email + password admin</b> (dibuat via Supabase, bukan akun trial).</li>
-  <li>Menu <b>🛠️ Admin</b> di sidebar hanya berfungsi penuh untuk akun ber-peran admin.</li>
-  <li>Setelah login pertama, segera ganti password berkala dan jangan dibagikan ke pemain.</li>
+  <li>Buka https://muba-fc.vercel.app → Beranda → Masuk (email+password admin).</li>
+  <li>Menu 🛠️ Admin hanya untuk role admin. Ganti password berkala via Supabase → Users → Reset.</li>
+  <li>2 admin aktif. Menambah admin: SQL update profiles role.</li>
 </ol>
 
-<h2 class="ch" id="c3">3. Approve Pendaftar Baru</h2>
-<ol class="steps">
-  <li>Buka <b>Admin → ✅ Approve pendaftar</b>. Pendaftar baru berstatus <i>pending</i> dan <b>tidak bisa isi list</b> sebelum di-approve.</li>
-  <li>Cek nama, WA, dan email. Kenali orangnya? Klik <b>Approve ✅</b>. Tidak kenal? <b>Tolak</b>.</li>
-</ol>
-<div class="box red"><b class="t">⚠️ Keamanan</b>Jangan approve yang tidak dikenal. Satu orang satu akun.</div>
+<h2 class="ch" id="c3">3. Approve Pendaftar</h2>
+<p>Admin → Approve: pending tidak bisa isi list. Cek nama/WA → Approve ✅ / Tolak.</p>
 
-<h2 class="ch pagebreak" id="c4">4. Kelola Jadwal Main</h2>
-<p>Buka <b>Admin → 📅 Kelola Jadwal</b>.</p>
-<h3>Membuat jadwal</h3>
-<ol class="steps">
-  <li>Isi <b>Tanggal</b>, <b>Jam</b> (contoh <code>20:00-22:00</code>), <b>Lokasi</b> → <b>Buat Jadwal</b>.</li>
-  <li>Kuota otomatis <b>28 orang</b> (GK 4 • Belakang/Tengah/Depan @8). Jadwal langsung muncul di HP pemain.</li>
-</ol>
-<h3>Mengubah & menghapus</h3>
+<h2 class="ch" id="c4">4. Kelola Jadwal FUN</h2>
+<p>Admin → Kelola Jadwal: Tanggal/Jam/Lokasi → kuota 28 (GK4/Belakang8/Tengah8/Depan8). Status: buka/tutup/full_booked/sparing-14. Hapus mengembalikan kredit deposit (GK ke GK).</p>
+
+<h2 class="ch" id="c5">5. Roster, Check-in & Radar Tunggakan</h2>
 <ul>
-  <li><b>✏️ Ubah:</b> ganti tanggal/jam/lokasi. Peserta yang sudah list tidak hilang.</li>
-  <li><b>🗑️ Hapus:</b> jika sudah ada yang ikut, sistem minta konfirmasi dan <b>mengembalikan kredit deposit otomatis</b> (ke bucket asal: GK kembali ke GK).</li>
-</ul>
-<h3>Status jadwal</h3>
-<table>
-  <tr><th>Status</th><th>Arti</th><th>Efek ke pemain</th></tr>
-  <tr><td>🟢 Buka</td><td>Normal, kuota 28</td><td>Bisa isi list</td></tr>
-  <tr><td>⏸️ Tutup</td><td>Ditutup sementara</td><td>Tombol ikut hilang</td></tr>
-  <tr><td>🔴 Full Booked</td><td>Lapangan penuh/dipakai pihak lain</td><td>Banner merah, tidak bisa ikut</td></tr>
-  <tr><td>🤝 Sparing (14)</td><td>Cari lawan, butuh setengah tim</td><td>Kuota 14 (GK 2, lainnya @4). Yang sudah list &gt;14 tidak ditendang, list baru dikunci + peringatan ke admin</td></tr>
-</table>
-
-<h2 class="ch" id="c5">5. Roster per Tanggal & Check-in Lapangan</h2>
-<p>Halaman utama kerja lapangan: <b>Admin → 👥 Roster per tanggal</b> → pilih tanggal game. Peserta dikelompokkan per posisi + badge: <b>✅ Lunas</b> • <b>💵 Di tempat</b> • <b>🔒 Wajib bayar</b>. Tombol <b>📋 Salin ke WA</b> menyalin list rapi per posisi untuk ditempel ke grup.</p>
-<h3>Tiga tombol check-in per nama</h3>
-<table>
-  <tr><th>Tombol</th><th>Kapan dipakai</th><th>Efek</th></tr>
-  <tr><td><b>Lunas ✅</b></td><td>Pemain bayar cash di tempat (25rb, <b>GK 15rb</b>)</td><td>Status Lunas + nominal masuk kas otomatis</td></tr>
-  <tr><td><b>Belum bayar</b></td><td>Datang tapi belum bayar</td><td>Jadi <b>tunggakan</b> → dikunci tidak bisa ikut game berikutnya</td></tr>
-  <tr><td><b>Tidak datang</b></td><td>Mangkir</td><td>Deposit hangus. Bayar-di-tempat → jadi tunggakan</td></tr>
-</table>
-<h3>Void tunggakan</h3>
-<p>Kasus darurat (sakit, duka) atau bantuan: klik <b>Void</b> + isi alasan (hanya terlihat admin). Pemain bisa isi list lagi.</p>
-
-<h2 class="ch" id="c6">6. Walk-in: Datang Tanpa Isi List</h2>
-<ol class="steps">
-  <li>Di Roster, buka kartu <b>🚶 Walk-in H-day</b>.</li>
-  <li>Pilih pemain (yang sudah di list tidak muncul), posisi, dan cara: <b>Potong 1 kredit</b> (GK pakai kredit GK dulu) atau <b>Lunas cash</b> (otomatis 15rb jika GK, 25rb lainnya).</li>
-  <li><b>Tambah ke List</b>. Kuota dan slot posisi dicek otomatis.</li>
-</ol>
-
-<h2 class="ch pagebreak" id="c7">7. Verifikasi Pembayaran (QRIS/Transfer)</h2>
-<ol class="steps">
-  <li>Pemain bayar ke QRIS/rekening komunitas lalu kirim konfirmasi dari menu Top-Up (boleh harga Pemain atau harga GK 🧤).</li>
-  <li><b>Admin → 💳 Verifikasi pembayaran</b>: cek nama, paket, metode, info bukti vs mutasi.</li>
-  <li>Cocok? <b>Setujui ✅</b> → kredit masuk ke bucket yang sesuai (klaim GK masuk kredit GK). Paket 4x (90rb maupun 50rb GK) otomatis menjadikan pemain <b>⭐ Member</b>. Tidak cocok? <b>Tolak</b> + alasan (terlihat pemain).</li>
-</ol>
-
-<h2 class="ch" id="c8">8. Kredit Manual: Cash, Bantuan & Koreksi</h2>
-<p>Kartu <b>➕ Kredit manual</b> memakai model pilih-nama-dulu: ketik/cari di kolom <b>🔍</b> (atau buka dropdown), pilih 1 pemain → kartu aksi muncul (saldo + semua tombol). Pilihan bertahan setelah aksi, enak untuk input beruntun.</p>
-<ul>
-  <li><b>+1 / +4 cash</b> — bayar tunai tanpa klaim (25rb/90rb).</li>
-  <li><b>+1 / +4 GK</b> — harga kiper (15rb/50rb), masuk bucket GK.</li>
-  <li><b>−1 R / −1 P / −1 RGK</b> — kurangi kredit (wajib isi alasan, tercatat privat).</li>
-  <li><b>Jadi/Cabut ⭐</b> — atur member manual.</li>
-  <li><b>🎗️ Kredit bantuan (privat)</b> — untuk pemain yang tidak mampu bayar. Pemain hanya melihat label netral “Kredit admin”; alasan hanya terlihat admin dan tidak dihitung pemasukan kas.</li>
+  <li>Roster per tanggal: pilih jadwal → daftar per posisi + badge ✅ Lunas / 💵 Di tempat / 🔒 Wajib bayar.</li>
+  <li>Check-in: Lunas ✅ / Belum bayar → tunggakan / Tidak datang → no-show atau hutang.</li>
+  <li>Radar: ringkasan “Belum bayar: x orang • Rp...” + filter Semua/Belum/Lunas + checkbox bulk + Lunaskan terpilih (1 klik). Void untuk pengecualian.</li>
+  <li>Salin ke WA memakai template MUBA resmi, export CSV, acak tim.</li>
 </ul>
 
-<h2 class="ch" id="c9">9. Hapus Data Salah Input</h2>
-<ul>
-  <li><b>Kas → Hapus</b> per baris: kredit yang terlanjur masuk <b>ditarik kembali otomatis</b> (ke bucket yang benar, tidak sampai minus). Ada konfirmasi yang menjelaskan efeknya.</li>
-  <li><b>Pengeluaran & sponsor:</b> tombol Ubah/Hapus di halaman Keuangan.</li>
-  <li><b>Jadwal:</b> hapus jadwal mengembalikan kredit deposit otomatis.</li>
-  <li>Membatalkan RSVP pemain: hanya via Tarik List (sebelum H-2) atau Void tunggakan.</li>
-</ul>
+<h2 class="ch" id="c6">6. Walk-in & Alih Slot</h2>
+<p>Walk-in: Roster → pilih pemain approved yang belum di list + posisi + potong/cash. Alih Slot (khusus admin): pilih slot (lunas/di tempat, bukan alihan) + pengganti approved yang belum di list → alihkan (deposit hangus privat, jejak alih_slot di Kas, maks 1x).</p>
 
-<h2 class="ch pagebreak" id="c10">10. Member, Harga GK & Aturan Sistem</h2>
-<table>
-  <tr><th></th><th>Pemain</th><th>Kiper (GK) 🧤</th></tr>
-  <tr><td>Sekali main</td><td>Rp25rb = 1 kredit</td><td>Rp15rb = 1 kredit GK</td></tr>
-  <tr><td>Paket 4x (member ⭐)</td><td>Rp90rb = 4 kredit</td><td>Rp50rb = 4 kredit GK</td></tr>
-</table>
-<ul>
-  <li><b>Member permanen</b> = pernah beli paket 4x (90rb/50rb GK) yang disetujui. Kredit habis tidak menghilangkan member. Liga khusus member.</li>
-  <li><b>Kredit GK terkunci:</b> hanya bisa dipakai saat main sebagai GK. Main posisi lain memakai kredit normal. Refund kembali ke bucket asal.</li>
-  <li><b>Cara ikut tinggal 2:</b> potong deposit atau bayar cash di tempat (opsi utang sudah dihapus).</li>
-</ul>
-<div class="box"><b class="t">📌 Aturan H-2</b>Batal/refund hanya sampai <b>H-2</b>. Setelah itu tetap wajib bayar (25rb / GK 15rb) walau tidak datang. Belum bayar = <b>tidak bisa isi list game berikutnya</b> — termasuk bayar-di-tempat yang belum dikonfirmasi lunas.</div>
+<h2 class="ch" id="c7">7. Verifikasi Pembayaran</h2>
+<p>Top-Up klaim (Pemain 25rb/90rb, GK 15rb/50rb) → Admin → Verifikasi: Setujui → kredit masuk bucket sesuai (GK ke GK), paket 4x jadi member. Tolak → alasan terlihat pemain.</p>
 
-<h2 class="ch" id="c11">11. Keuangan: Kas Awal, Pengeluaran, Sponsor</h2>
-<p>Buka <b>Admin → 💰 Keuangan & PL</b>, pilih periode bulan.</p>
-<ul>
-  <li><b>🏦 Kas awal:</b> uang kas sebelum web dipakai. Input sekali (nominal + tanggal) → otomatis jadi saldo pembuka tiap bulan.</li>
-  <li><b>Pengeluaran:</b> Tanggal → Jenis (<b>Sewa Lapangan / Makanan dan Minuman / Transportasi / Bank Fee</b>) → Keterangan → Nominal. Bisa ubah/hapus.</li>
-  <li><b>🤝 Sponsor/manual:</b> Tanggal → Sumber → Keterangan → Nominal. Pemasukan pemain otomatis dari kas; form ini khusus sponsor & luar kas.</li>
-</ul>
+<h2 class="ch" id="c8">8. Kredit Manual & Bantuan</h2>
+<p>Kartu Kredit manual: ketik/cari nama (combobox) → 1 pemain terpilih → +1/+4 cash, +1/+4 GK, −1 P/R/PGK/RGK, Jadi/Cabut ⭐. Bantuan privat: kredit masuk, pemain lihat “Kredit admin” netral, alasan hanya admin. Semua tercatat private_note.</p>
 
-<h2 class="ch" id="c12">12. Laporan Laba Rugi & Arus Kas (PDF)</h2>
-<ul>
-  <li><b>Saldo awal</b> → <b>A. Pemasukan</b> (A1 kas otomatis + A2 sponsor) → <b>B. Pengeluaran</b> → <b>Surplus/Defisit</b> → <b>Saldo akhir</b>.</li>
-  <li><b>C. Arus Kas:</b> saldo awal → arus masuk (iuran vs sponsor) → arus keluar per jenis → kas bersih → saldo akhir.</li>
-  <li><b>⬇️ Download PDF:</b> Cetak → Save as PDF. Hasil: kop MUBA FC + logo + basecamp + tabel + tanda tangan. <b>⬇️ CSV</b> untuk Excel.</li>
-</ul>
-<div class="box green"><b class="t">✅ Transparansi</b>Deposit adalah titipan main, bukan laba bersih. Laporan ini adalah <b>arus kas komunitas</b> — footnote tercantum di dokumen.</div>
+<h2 class="ch" id="c9">9. Hapus & Koreksi</h2>
+<p>Kas → Hapus menarik kembali kredit (ke bucket benar). Pengeluaran/sponsor: Ubah/Hapus di Keuangan. Jadwal: hapus refund. RSVP: Void.</p>
 
-<h2 class="ch" id="c13">13. Kelola Liga 6 Bulan</h2>
-<ol class="steps">
-  <li>Member daftar ke Tim A/B/C/D + posisi (per tim 7 orang: GK 1, Belakang/Tengah/Depan @2). Non-member ditolak otomatis.</li>
-  <li><b>🔒 Kunci Skuad</b> saat final — tidak bisa daftar/pindah 6 bulan. Pergantian via <b>Keluarkan</b> per pemain.</li>
-  <li>Buat jadwal tanding kapan saja (Home vs Away + tanggal + jam + lokasi). Bisa hapus.</li>
-  <li>Input skor + pencetak gol (pisah koma) → <b>klasemen (M3/S1/K0) & top skor otomatis</b>.</li>
-</ol>
+<h2 class="ch" id="c10">10. Keuangan & Laporan</h2>
+<p>Keuangan → Kas awal (sekali) → pengeluaran 4 jenis + sponsor manual → PL per bulan (Saldo awal = kas awal + carry-forward, A1 kas otomatis, A2 sponsor, B pengeluaran, Surplus, Saldo akhir) + Arus Kas. Download PDF kop MUBA + CSV.</p>
 
-<h2 class="ch" id="c14">14. Export Data & Acak Tim</h2>
-<ul>
-  <li><b>Database pemain:</b> ⬇️ CSV (nama, WA, email, status, member, kredit P/R/GK, tunggakan Rp, total ikut) + 🖨️ Cetak/PDF.</li>
-  <li><b>Per jadwal:</b> di Roster → CSV / Cetak. <b>🎲 Acak 4 Tim</b> (seimbang posisi, bisa acak ulang) → CSV + kolom Tim.</li>
-</ul>
+<h2 class="ch" id="c11">11. Akad</h2>
+<p>v1-sep2026: 6 checkbox wajib saat daftar + prompt sekali untuk akun lama + halaman /akad read-only. Kolom profiles setuju_akad/at/akad_version. Revisi T&C naik versi → minta setuju ulang.</p>
 
-<h2 class="ch" id="c15">15. FAQ & Troubleshooting</h2>
+<h2 class="ch" id="c12">12. FAQ Troubleshooting</h2>
 <table>
   <tr><th>Masalah</th><th>Solusi</th></tr>
-  <tr><td>Pemain tidak bisa isi list</td><td>Cek: approve? tunggakan/bayar-di-tempat belum lunas? slot posisi penuh? jadwal tutup? member (liga)? kredit cukup?</td></tr>
-  <tr><td>Kredit tidak masuk setelah bayar</td><td>Cek antrian verifikasi klaim; pastikan Setujui. Cek bucket: klaim GK masuk kredit GK.</td></tr>
-  <tr><td>Salah input</td><td>Hapus di Kas (kredit ikut ditarik) / −1 koreksi + alasan / Ubah-Hapus pengeluaran & sponsor.</td></tr>
-  <tr><td>Peserta &gt;14 saat sparing</td><td>Tidak ada yang ditendang otomatis — hubungi / coret manual + refund via Void.</td></tr>
-  <tr><td>Top-up error “column … schema cache”</td><td>Kolom baru belum ada / cache belum refresh: jalankan ALTER + <code>NOTIFY pgrst, 'reload schema'</code>, tunggu 1 menit.</td></tr>
-  <tr><td>Lupa password admin</td><td>Reset via Supabase → Authentication → Users → Reset password.</td></tr>
+  <tr><td>Tidak bisa isi list</td><td>Cek approve, tunggakan/belum-lunas, slot penuh, jadwal tutup.</td></tr>
+  <tr><td>GK tidak bisa potong</td><td>Cek bucket GK vs Pemain; pakai tombol GK.</td></tr>
+  <tr><td>column is_gk schema cache</td><td>Run ALTER + NOTIFY reload schema, tunggu 1 menit.</td></tr>
 </table>
 
 <div class="foot">
-  <b>MUBA FC • Masjid Utsman Bin Affan</b> — Panduan Admin • 🌐 https://muba-fc.vercel.app • 📍 Tarasso Coffee, Jl. Adam Malik No. 58, Kreo Selatan, Larangan, Tangerang • Abu Faqih (081281186360) • Irfan (081395771559)
+  <b>MUBA FC • Masjid Utsman Bin Affan</b> — Panduan Admin • 🌐 https://muba-fc.vercel.app • Tarasso Coffee • Abu Faqih 081281186360 • Irfan 081395771559
 </div>
-
 </body>
 </html>

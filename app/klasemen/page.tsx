@@ -77,7 +77,7 @@ export default function KlasemenPage(){
 
   return (
     <div>
-      <h2 style={{ margin:"4px 0" }}>🏆 Klasemen Liga</h2>
+      <h2 style={{ margin:"4px 0" }}>🏆 Klasemen KIM x DnA Health League</h2>
       <p className="muted">Pilih edisi untuk filter — Overall untuk gabungan.</p>
       <div className="row" style={{ marginBottom:8 }}>
         <button className={`btn secondary small`} style={{ borderColor: !selectedEd?"var(--gold)":"" }} onClick={()=>setSelectedEd(null)}>🏆 Overall</button>

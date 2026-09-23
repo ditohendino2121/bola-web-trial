@@ -161,7 +161,7 @@ export default function LigaRegistrasi() {
 
   return (
     <div>
-      <h2 style={{ margin:"4px 0" }}>📝 Registrasi MUBA League KIM x DnA {locked && <span className="badge red">🔒 Skuad dikunci</span>}</h2>
+      <h2 style={{ margin:"4px 0" }}>📝 Registrasi KIM x DnA Health League {locked && <span className="badge red">🔒 Skuad dikunci</span>}</h2>
       <p className="muted">Khusus ⭐ Member • Pool: GK 4, Belakang 8, Tengah 8, Depan 8 • Maks 6 hari.</p>
       {me && !isMember && <div className="banner warn">Liga khusus member. <b>Beli paket 90rb di Top-Up</b> untuk jadi member.</div>}
 

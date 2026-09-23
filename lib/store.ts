@@ -166,3 +166,22 @@ export function netSebelumBulan(db: DB, monthKey: string) {
 export function saldoAwalBulan(db: DB, monthKey: string) {
   return (db.settings?.kasAwal || 0) + netSebelumBulan(db, monthKey);
 }
+
+/** Wallet refund — tarif per kredit */
+export const TARIF_KREDIT = { paket: 22500, reguler: 25000, paket_gk: 12500, reguler_gk: 15000 } as const;
+export function nominalWallet(w: Wallet) {
+  return (w.paket||0)*TARIF_KREDIT.paket + (w.reguler||0)*TARIF_KREDIT.reguler + (w.paket_gk||0)*TARIF_KREDIT.paket_gk + (w.reguler_gk||0)*TARIF_KREDIT.reguler_gk;
+}
+/** Total kredit bantuan gratis (metode bantuan_privat) yg pernah diberi ke user */
+export function totalBantuanGranted(db: DB, userId: string) {
+  return db.txs.filter(t=> t.userId===userId && t.metode==="bantuan_privat" && t.status==="success").reduce((a,t)=> a + (t.kreditReguler||0)+(t.kreditPaket||0),0);
+}
+/** Sisa refundable setelah mengecualikan bantuan (asumsi konservatif: bantuan di R dulu) */
+export function refundableWallet(db: DB, userId: string): { sisa: Wallet; refundable: Wallet; bantuanSisa: number; nominal: number; } {
+  const w = walletOf(db, userId);
+  const bantuanTotal = totalBantuanGranted(db, userId);
+  const bantuanSisa = Math.min(w.reguler||0, bantuanTotal);
+  const refundable: Wallet = { paket: w.paket||0, reguler: Math.max(0,(w.reguler||0)-bantuanSisa), paket_gk: w.paket_gk||0, reguler_gk: w.reguler_gk||0 };
+  const nominal = nominalWallet(refundable);
+  return { sisa: w, refundable, bantuanSisa, nominal };
+}

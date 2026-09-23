@@ -9,7 +9,7 @@ export const KONTAKS: Kontak[] = [
   { nama: "Irfan", hp: "081395771559", wa: "https://wa.me/6281395771559?text=" + encodeURIComponent("Assalamu'alaikum, mau tanya soal MUBA FC") },
 ];
 
-export const JENIS_PENGELUARAN = ["Sewa Lapangan", "Makanan dan Minuman", "Transportasi", "Bank Fee"] as const;
+export const JENIS_PENGELUARAN = ["Sewa Lapangan", "Makanan dan Minuman", "Transportasi", "Bank Fee", "Refund Pemain"] as const;
 export type JenisPengeluaran = (typeof JENIS_PENGELUARAN)[number];
 
 export interface Expense { id: string; tanggal: string; jenis: string; keterangan: string; nominal: number; }

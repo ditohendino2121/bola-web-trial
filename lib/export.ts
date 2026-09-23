@@ -27,98 +27,37 @@ export function tanggalID(iso: string) {
 
 export function jamTitik(jam: string) { return (jam || "").replace(/:/g, "."); }
 
-/** Template broadcast WA list squad MUBA FC (verbatim + slot dinamis). */
+/** Template broadcast WA — format baru Bismillah (slot dinamis, MAPS ARK/Google). */
 export function buildWAList(
   schedule: { tanggal: string; jam: string; lokasi: string; status?: string },
- slotCount: (posisi: string) => number,
+  slotCount: (posisi: string) => number,
   namesOf: (posisi: string) => string[],
 ) {
   const isArk = /ark/i.test(schedule.lokasi || "");
-  const mapsLine = isArk ? `\n🌐 "${ARK_MAPS_URL}"\n` : "";
-  const posisiUrutan = ["GK", "Belakang", "Tengah", "Depan"];
+  const mapsUrl = isArk ? ARK_MAPS_URL : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(schedule.lokasi || "")}`;
+  const mapsLine = schedule.lokasi ? mapsUrl : "-";
   const totalMaks = slotCount("GK") + slotCount("Belakang") + slotCount("Tengah") + slotCount("Depan");
 
   const blokGK = (() => {
     const names = namesOf("GK");
     const n = slotCount("GK");
-    let t = "🥅_LIST GK_\n\n";
-    for (let i = 0; i < n; i++) t += `${i + 1}.${names[i] ? " " + names[i] : ""}\n`;
-    return t;
+    let t = "";
+    for (let i = 0; i < n; i++) t += `${i + 1}. ${names[i] || ""}\n`;
+    return t.trimEnd();
   })();
 
-  const blokPemain = (() => {
-    let t = "⚽️_LIST PEMAIN_ \n";
+  const blokPlayer = (() => {
+    let t = "";
     (["Belakang", "Tengah", "Depan"] as const).forEach((p) => {
       const names = namesOf(p);
       const n = slotCount(p);
       t += `${p}\n`;
-      for (let i = 0; i < n; i++) t += `  ${i + 1}.${names[i] ? " " + names[i] : ""}\n`;
+      for (let i = 0; i < n; i++) t += `${i + 1}. ${names[i] || ""}\n`;
     });
-    return t;
+    return t.trimEnd();
   })();
 
-  return (
-`🔰🔰🔰🔰🔰🔰🔰🔰
-    MUBA FC FUN
-🔰🔰🔰🔰🔰🔰🔰🔰
-      FUN MINI SOCCER
-🔰🔰🔰🔰🔰🔰🔰🔰
-
-Berlokasi Di :
-🏟️ *${schedule.lokasi}*
-${mapsLine}
-🔅🔅🔅🔅🔅🔅🔅🔅
-🗓️ *${tanggalID(schedule.tanggal)}*
-⏰ *${jamTitik(schedule.jam)}*
-🔅🔅🔅🔅🔅🔅🔅🔅
-
-🔸️🔹️🔸️🔹️🔸️🔹️🔸️🔹️
-    🏷️ HTM: *25K* / player (MEMEBER 90K utk 4x main)
-                     *15K* / Kiper (memeber 50k utk 4x main)
-
-
-🔹️🔸️🔹️🔸️🔹️🔸️🔹️🔸️
-
-Bismillah, Dengan Semangat ✊
- #KitaKuatKarenaKitaPatungan
-- Mohon Langsung Bayar HTM (By Cash/Transfer)
-- Mohon Bayar HTM Dengan Uang Pas
-- Teman Boleh Ikut Join Main
-
-💳 Atau Transfer ke :
-BCA Syariah
-No rek 036.000. 7496
-a.n Muhamad Ali Sodiqin  (*Abu Faqih*)
-👉🏻 Konfirmasi Transfer & Informasi wa.me/6281281186360 (*Abu Faqih*)
-
-Benefit :
-⚽️ : Menambah saudara ✅
-🥤 : Minum + Snack ✅
-🩺 : P3K ✅
-〰️〰️〰️〰️〰️〰️〰️〰️
-*🛡MUBA FC LIST SQUAD🛡
-〰️〰️〰️〰️〰️〰️〰️〰️
-${blokGK}
-${blokPemain}
-(Maksimal ${totalMaks} ya)
-
-
-📔 MAIN & MATCH RULES ‼️
-- Bermain sportif
-- Menutup Aurat (legging/celana 3/4, celana training)
-- TIDAK MEROKOK / VAPE 🚭
-- Datang ONTIME
-- Pakai Jersey MUBA FC atau kaos warna hitam
-
-Semoga Allah Subhanahu wa Ta'ala mudahkan, Aamiin.
-Jazakumullahu Khairan. Barakallahu Fiik.
-
-*MUBA FC*
-_Ikhtiar Sehat Menjalin Ukhuwah_
-#AdabDuluanSkillBelakangan
-_List Aja Dulu Curhat Belakangan_
-#KitaKuatKarenaKitaPatungan`
-  );
+  return `_Bismillah.._\n\n📣 *MUBA FC*\n_Present:_\n⚽ *FUN MINI SOCCER*\n🗓️ *${tanggalID(schedule.tanggal)}*\n⏰ *${jamTitik(schedule.jam)}*\n🏟️ *${schedule.lokasi}*\n📍 ${mapsLine}\n\n🏷️ HTM:\n👤 *25K*/Player\n(Join Member *90K* jatah main 4x)\n🥅 *15K*/Goal Keeper\n(Join Member *50k* jatah main 4x)\n\n⚠️ *NB*\n- Demi ketertiban & kenyamanan bersama mohon dapat mendaftar/join via Web Resmi *MUBA FC* serta melakukan pembayaran via Web\n\n*[Terlampir]*\n🌐 https://muba-fc.vercel.app/\n\n📌 *Update list skuad MUBA FC yang sudah join via WEB:*\n\n🥅 *Goal Keeper*\n${blokGK}\n\n👤 *Player*\n${blokPlayer}\n\n*(Ayo daftar slot terbatas!)*\n\n📔 MAIN & MATCH RULES ‼️\n- Bermain Sportif\n- Menutup Aurat (Legging/Celana 3/4, Celana Training)\n- TIDAK MEROKOK / VAPE 🚭\n- Datang ONTIME\n- Pakai Jersey MUBA FC atau kaos warna hitam\n\nSemoga Allah Ta'ala Mudahkan\nJazakumullahu Khairan Barakallahu Fiikum\n\n🖋️ *Official MUBA FC*`;
 }
 
 /** Acak 28 pemain jadi 4 tim seimbang per posisi */

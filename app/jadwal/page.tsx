@@ -15,11 +15,28 @@ export default function Jadwal() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [posisiPilih, setPosisiPilih] = useState<Record<string, PosisiMain>>({});
+  const [selected, setSelected] = useState<string | null>(null);
   const reload = () =>fetchAll().then(setDb).catch((e: any) =>setErr(e.message));
   useEffect(() => { reload(); }, []);
+
+  // hooks harus di atas sebelum early return — data turunan di-guard jika db null
+  const todayISO = todayLocalISO();
+  const jadwalBiasa: any[] = db ? db.schedules.filter((s:any)=>!s.is_liga).sort((a: any, b: any) =>a.tanggal.localeCompare(b.tanggal)) : [];
+  const upcoming: any[] = jadwalBiasa.filter((s:any)=> s.tanggal >= todayISO);
+  const upcomingDates: string[] = (Array.from(new Set(upcoming.map((s:any)=> s.tanggal as string))) as string[]).sort();
+  const accentFor = (idx:number)=> ["accent-gold","accent-lilac","accent-teal","accent-pink","accent-blue"][idx%5];
+  const datesKey = upcomingDates.join(",");
+  useEffect(()=>{
+    if(!db) return;
+    const q = new URLSearchParams(window.location.search).get("tgl");
+    if(q && (upcomingDates as string[]).includes(q)) setSelected(q as string);
+    else if(upcomingDates.length>0 && !selected) setSelected(upcomingDates[0] as string);
+  }, [db, datesKey]);
+  const visible = selected ? upcoming.filter((s:any)=> s.tanggal===selected) : upcoming;
+
+  const me = db ? db.users.find((u: any) =>u.id === db.sessionId) : null;
   if (err) return <div className="card"><div className="banner err"> {err}</div></div>;
   if (!db) return <div className="card"><p>Memuat...</p></div>;
-  const me = db.users.find((u: any) =>u.id === db.sessionId);
   if (!me) return <div className="card"><h3>Login dulu yuk </h3><p className="muted">Daftar / login di Beranda, gratis.</p></div>;
   if (me.status !== "approved") return <div className="card"><div className="banner warn">Akun <b>{me.nama}</b>masih <b>{me.status}</b>. Minta admin approve dulu ya.</div></div>;
 
@@ -44,18 +61,6 @@ export default function Jadwal() {
   const terkunci = dikunciRSVP(db, me.id);
   const nLangsung = langsungBelumLunas(db, me.id).length;
 
-  const todayISO = todayLocalISO();
-  const jadwalBiasa = db.schedules.filter((s:any)=>!s.is_liga).sort((a: any, b: any) =>a.tanggal.localeCompare(b.tanggal));
-  const upcoming = jadwalBiasa.filter((s:any)=> s.tanggal >= todayISO);
-  const upcomingDates: string[] = (Array.from(new Set(upcoming.map((s:any)=> s.tanggal as string))) as string[]).sort();
-  const accentFor = (idx:number)=> ["accent-gold","accent-lilac","accent-teal","accent-pink","accent-blue"][idx%5];
-  const [selected, setSelected] = useState<string | null>(null);
-  useEffect(()=>{
-    const q = new URLSearchParams(window.location.search).get("tgl");
-    if(q && (upcomingDates as string[]).includes(q)) setSelected(q as string);
-    else if(upcomingDates.length>0 && !selected) setSelected(upcomingDates[0] as string);
-  }, [upcomingDates.join(",")]);
-  const visible = selected ? upcoming.filter((s:any)=> s.tanggal===selected) : upcoming;
   return (
     <div>
       <div className="page-head" style={{ marginBottom: 6 }}><h2 style={{ margin: "4px 0" }}>Mau ikut yang mana?</h2><p>Jadwal FUN upcoming — tap tanggal untuk filter list</p></div>

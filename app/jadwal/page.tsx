@@ -7,6 +7,9 @@ import {
 } from "../../lib/store";
 import { fetchAll, rsvp, batalRsvp } from "../../lib/db";
 
+function todayLocalISO() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function labelTanggal(iso:string){ const d=new Date(iso+"T00:00:00"); const days=["Min","Sen","Sel","Rab","Kam","Jum","Sab"]; return {label:days[d.getDay()], num:String(d.getDate()).padStart(2,"0")}; }
+
 export default function Jadwal() {
   const [db, setDb] = useState<any>(null);
   const [err, setErr] = useState("");
@@ -41,19 +44,32 @@ export default function Jadwal() {
   const terkunci = dikunciRSVP(db, me.id);
   const nLangsung = langsungBelumLunas(db, me.id).length;
 
+  const todayISO = todayLocalISO();
   const jadwalBiasa = db.schedules.filter((s:any)=>!s.is_liga).sort((a: any, b: any) =>a.tanggal.localeCompare(b.tanggal));
+  const upcoming = jadwalBiasa.filter((s:any)=> s.tanggal >= todayISO);
+  const upcomingDates: string[] = (Array.from(new Set(upcoming.map((s:any)=> s.tanggal as string))) as string[]).sort();
   const accentFor = (idx:number)=> ["accent-gold","accent-lilac","accent-teal","accent-pink","accent-blue"][idx%5];
-  const weekDays = (()=>{ const days=["Min","Sen","Sel","Rab","Kam","Jum","Sab"]; const today=new Date(); const start=new Date(today); start.setDate(today.getDate()-today.getDay()); return Array.from({length:7},(_,i)=>{ const d=new Date(start); d.setDate(start.getDate()+i); const iso=d.toISOString().slice(0,10); const has=jadwalBiasa.some((s:any)=>s.tanggal===iso); const isToday=iso===today.toISOString().slice(0,10); return {label:days[d.getDay()], num:String(d.getDate()).padStart(2,"0"), iso, has, isToday}; });})();
+  const [selected, setSelected] = useState<string | null>(null);
+  useEffect(()=>{
+    const q = new URLSearchParams(window.location.search).get("tgl");
+    if(q && (upcomingDates as string[]).includes(q)) setSelected(q as string);
+    else if(upcomingDates.length>0 && !selected) setSelected(upcomingDates[0] as string);
+  }, [upcomingDates.join(",")]);
+  const visible = selected ? upcoming.filter((s:any)=> s.tanggal===selected) : upcoming;
   return (
     <div>
-      <div className="page-head" style={{ marginBottom: 6 }}><h2 style={{ margin: "4px 0" }}>Mau ikut yang mana?</h2><p>Jadwal FUN — Scores style, pilih tanggal di bawah</p></div>
-      <div className="date-strip">
-        {weekDays.map((d)=> (<button key={d.iso} className={`date-pill ${d.isToday ? "on" : ""} ${d.has ? "has" : ""}`} disabled={!d.has} onClick={() => d.has && document.getElementById(`jad-${d.iso}`)?.scrollIntoView({behavior:"smooth", block:"center"}) }>{d.label}<b>{d.num}</b></button>))}
-      </div>
+      <div className="page-head" style={{ marginBottom: 6 }}><h2 style={{ margin: "4px 0" }}>Mau ikut yang mana?</h2><p>Jadwal FUN upcoming — tap tanggal untuk filter list</p></div>
+      {upcomingDates.length>0 ? (
+        <div className="date-strip">
+          {upcomingDates.map((iso: string)=> { const {label,num}=labelTanggal(iso); const on=iso===selected; return (<button key={iso} className={`date-pill ${on ? "on" : ""} has`} onClick={()=> setSelected(iso as string)}>{label}<b>{num}</b></button>); })}
+        </div>
+      ) : null}
       <p className="muted" style={{ fontSize: 12, margin: "2px 0 8px" }}>Kuota 28: GK 4 · Belakang/Tengah/Depan @8. Untuk jadwal liga, buka panel Liga.</p>
       {terkunci && <div className="banner err"> {nLangsung > 0 ? `Kamu ada ${nLangsung}x bayar-di-tempat yang belum dikonfirmasi lunas admin. Selesaikan dulu untuk buka list berikutnya.` : "Kamu punya tunggakan. Lunasi ke admin dulu untuk buka list berikutnya."}</div>}
       {jadwalBiasa.length===0 && <div className="card"><p className="muted">Belum ada jadwal FUN. Admin buat di Kelola Jadwal.</p></div>}
-      {jadwalBiasa.map((s: any, idx:number) => {
+      {upcoming.length===0 && jadwalBiasa.length>0 && <div className="card"><p className="muted">Semua jadwal sudah lewat. Menunggu jadwal baru dari admin.</p></div>}
+      {selected && upcomingDates.length>1 && <p className="muted" style={{ fontSize:12, margin:"6px 0 2px" }}>Menampilkan tanggal <b style={{ color:"#fff" }}>{selected}</b> — {visible.length} jadwal • <a onClick={()=> setSelected(null)} style={{ color:"var(--gold)", cursor:"pointer", textDecoration:"underline" }}>tampilkan semua upcoming</a></p>}
+      {visible.map((s: any, idx:number) => {
       const list = db.rsvps.filter((r: any) =>r.scheduleId === s.id && r.status !== "cancelled");
       const mine = list.find((r: any) =>r.userId === me.id);
       const ka = kuotaAktif(s);

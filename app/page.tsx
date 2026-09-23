@@ -16,11 +16,11 @@ export default function Home() {
   const me = db.users.find((u: any) => u.id === db.sessionId);
 
   const greet = (() => { const h=new Date().getHours(); if(h<11) return "Selamat pagi"; if(h<15) return "Selamat siang"; if(h<18) return "Selamat sore"; return "Selamat malam"; })();
-  const weekDays = (() => {
-    const days=["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
-    const today=new Date(); const start=new Date(today); start.setDate(today.getDate()-today.getDay());
-    return Array.from({length:7},(_,i)=>{ const d=new Date(start); d.setDate(start.getDate()+i); const iso=d.toISOString().slice(0,10); const has=db.schedules.some((s:any)=>s.tanggal===iso); const isToday=iso===today.toISOString().slice(0,10); return {label:days[d.getDay()], num:String(d.getDate()).padStart(2,"0"), iso, has, isToday}; });
-  })();
+  function todayLocalISO(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+  function labelTanggal(iso:string){ const d=new Date(iso+"T00:00:00"); const days=["Min","Sen","Sel","Rab","Kam","Jum","Sab"]; return {label:days[d.getDay()], num:String(d.getDate()).padStart(2,"0")}; }
+  const todayISO = todayLocalISO();
+  const upcomingSchedules = db.schedules.filter((s:any)=> !s.is_liga && s.tanggal >= todayISO).sort((a:any,b:any)=> a.tanggal.localeCompare(b.tanggal));
+  const upcomingDates: string[] = (Array.from(new Set(upcomingSchedules.map((s:any)=> s.tanggal as string))) as string[]).sort();
   const accentFor = (idx:number)=> ["accent-gold","accent-lilac","accent-pink","accent-teal","accent-blue"][idx%5];
 
   return (
@@ -33,13 +33,15 @@ export default function Home() {
         </div>
         <div className="avatar">{me ? me.nama.slice(0,1).toUpperCase() : "M"}</div>
       </div>
-      <div className="date-strip">
-        {weekDays.map((d)=> (
-          <Link key={d.iso} href="/jadwal" className={`date-pill ${d.isToday ? "on" : ""} ${d.has ? "has" : ""}`} style={{ textDecoration: "none" }}>
-            {d.label}<b>{d.num}</b>
-          </Link>
-        ))}
-      </div>
+      {upcomingDates.length>0 ? (
+        <div className="date-strip">
+          {upcomingDates.slice(0,8).map((iso: string)=> { const {label,num}=labelTanggal(iso); return (
+            <Link key={iso} href={`/jadwal?tgl=${iso}`} className="date-pill has" style={{ textDecoration: "none" }}>
+              {label}<b>{num}</b>
+            </Link>
+          ); })}
+        </div>
+      ) : null}
       <div className="hero">
         <img src="/logo-muba.jpg" alt="MUBA FC" className="logo" />
         <h1>MUBA FC</h1>
@@ -87,30 +89,32 @@ export default function Home() {
 
       <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div className="page-head" style={{ margin: 0 }}><h3 style={{ margin: 0 }}>Jadwal terdekat</h3><p>Scores — tap untuk isi list</p></div>
-          <Link href="/jadwal" className="badge gold" style={{ textDecoration: "none" }}>Live</Link>
+          <div className="page-head" style={{ margin: 0 }}><h3 style={{ margin: 0 }}>Jadwal terdekat</h3><p>Upcoming — tap tanggal di atas untuk filter</p></div>
+          <Link href="/jadwal" className="badge gold" style={{ textDecoration: "none" }}>{upcomingSchedules.length} upcoming</Link>
         </div>
-        {db.schedules.slice(0, 3).map((s: any, idx:number) => {
+        {upcomingSchedules.slice(0, 3).map((s: any, idx:number) => {
           const ikut = db.rsvps.filter((r: any) => r.scheduleId === s.id && r.status !== "cancelled").length;
           const sisa = (s.status === "sparing" ? 14 : s.kuota) - ikut;
           const isLive = s.status === "buka" && sisa>0;
           return (
-            <div key={s.id} className={`match-card ${accentFor(idx)}`} style={{ margin: "10px 0" }}>
-              <div className="match-card-top">
-                <div className="datebox" style={{ minWidth: 56 }}>{s.tanggal.slice(8,10)}<span>{s.tanggal.slice(5,7)}/{s.tanggal.slice(0,4)}</span></div>
-                <div className="match-card-mid">
-                  <div className="match-card-title">{s.jam} · {s.lokasi}</div>
-                  <div className="match-card-sub">{s.tanggal} · {ikut}/{s.status === "sparing" ? 14 : s.kuota} terisi · sisa {Math.max(0,sisa)}</div>
-                  <div className="match-card-odds">
-                    <span className={isLive?"gold":""}>{isLive?"BUKA":""+s.status.toUpperCase()}</span>
-                    <span>Rp25rb</span><span style={{ opacity: 0.7 }}>GK 15rb</span>
+            <Link key={s.id} href={`/jadwal?tgl=${s.tanggal}`} style={{ textDecoration:"none" }}>
+              <div className={`match-card ${accentFor(idx)}`} style={{ margin: "10px 0" }}>
+                <div className="match-card-top">
+                  <div className="datebox" style={{ minWidth: 56 }}>{s.tanggal.slice(8,10)}<span>{s.tanggal.slice(5,7)}/{s.tanggal.slice(0,4)}</span></div>
+                  <div className="match-card-mid">
+                    <div className="match-card-title">{s.jam} · {s.lokasi}</div>
+                    <div className="match-card-sub">{s.tanggal} · {ikut}/{s.status === "sparing" ? 14 : s.kuota} terisi · sisa {Math.max(0,sisa)}</div>
+                    <div className="match-card-odds">
+                      <span className={isLive?"gold":""}>{isLive?"BUKA":""+s.status.toUpperCase()}</span>
+                      <span>Rp25rb</span><span style={{ opacity: 0.7 }}>GK 15rb</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
-        {db.schedules.length===0 && <p className="muted" style={{ fontSize:13 }}>Belum ada jadwal. Admin buat di Kelola Jadwal.</p>}
+        {upcomingSchedules.length===0 && <p className="muted" style={{ fontSize:13 }}>{db.schedules.length===0 ? "Belum ada jadwal. Admin buat di Kelola Jadwal." : "Semua jadwal sudah lewat. Menunggu jadwal baru dari admin."}</p>}
         <Link href="/jadwal"><button className="btn secondary" style={{ marginTop: 10 }}>Lihat dan isi list</button></Link>
       </div>
     </div>

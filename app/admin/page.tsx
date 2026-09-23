@@ -24,27 +24,26 @@ export default function Admin() {
   const manualLabel = (u: any) => `${u.nama} (${u.wa})`;
   const [alihText, setAlihText] = useState("");
   const [alihPickAlih, setAlihPickAlih] = useState("");
-  const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
+  const reload = () =>fetchAll().then(setDb).catch((e: any) =>setErr(e.message));
   useEffect(() => { reload(); }, []);
-  if (err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
+  if (err) return <div className="card"><div className="banner err"> {err}</div></div>;
   if (!db) return <div className="card"><p>Memuat...</p></div>;
-  const me = db.users.find((u: any) => u.id === db.sessionId);
-  if (!me || me.role !== "admin") return <div className="card"><h3>🛠️ Khusus admin</h3><p className="muted">Login dengan akun admin.</p></div>;
-  const run = async (fn: () => Promise<void>) => {
+  const me = db.users.find((u: any) =>u.id === db.sessionId);
+  if (!me || me.role !== "admin") return <div className="card"><h3>Khusus admin</h3><p className="muted">Login dengan akun admin.</p></div>;
+  const run = async (fn: () =>Promise<void>) => {
     setBusy(true);
     try { await fn(); await reload(); } catch (e: any) { alert(e.message); }
     setBusy(false);
   };
 
   const refresh = reload;
-  const namaOf = (id: string) => db.users.find((u: any) => u.id === id)?.nama || id;
-  const sb = () => supa();
+  const namaOf = (id: string) =>db.users.find((u: any) =>u.id === id)?.nama || id;
+  const sb = () =>supa();
 
-  const approve = (id: string, ok: boolean) =>
-    run(() => adminUpdate("profiles", id, { status: ok ? "approved" : "rejected" }).then(() => {}));
+  const approve = (id: string, ok: boolean) =>run(() =>adminUpdate("profiles", id, { status: ok ? "approved" : "rejected" }).then(() => {}));
 
   const verifKlaim = async (txId: string, ok: boolean) => {
-    const t = db.txs.find((x: any) => x.id === txId);
+    const t = db.txs.find((x: any) =>x.id === txId);
     if (!t) return;
     let alasan = "";
     if (!ok) {
@@ -70,8 +69,7 @@ export default function Admin() {
     });
   };
 
-  const manualTopup = (userId: string, kind: "1x" | "4x", isGK = false) =>
-    run(async () => {
+  const manualTopup = (userId: string, kind: "1x" | "4x", isGK = false) =>run(async () => {
       const w = walletOf(db, userId);
       const patch = kind === "1x"
         ? (isGK ? { reguler_gk: w.reguler_gk + 1 } : { reguler: w.reguler + 1 })
@@ -111,8 +109,7 @@ export default function Admin() {
     });
   };
 
-  const beriBantuan = () =>
-    run(async () => {
+  const beriBantuan = () =>run(async () => {
       if (!bantuanUser) return alert("Pilih pemain dulu");
       const n = parseInt(bantuanKredit) || 1;
       const w = walletOf(db, bantuanUser);
@@ -127,12 +124,12 @@ export default function Admin() {
     });
 
   const toggleMember = (userId: string) => {
-    const u = db.users.find((x: any) => x.id === userId);
-    run(() => adminUpdate("profiles", userId, { is_member: !u?.is_member }).then(() => {}));
+    const u = db.users.find((x: any) =>x.id === userId);
+    run(() =>adminUpdate("profiles", userId, { is_member: !u?.is_member }).then(() => {}));
   };
 
   const hapusTx = async (txId: string) => {
-    const t = db.txs.find((x: any) => x.id === txId);
+    const t = db.txs.find((x: any) =>x.id === txId);
     if (!t) return;
     const granted = (t.kreditPaket || 0) + (t.kreditReguler || 0);
     if (!confirm(`Hapus "${t.label}"?${granted > 0 && t.status === "success" ? `\nKredit yang sudah masuk (${granted}) akan ditarik kembali.` : ""}`)) return;
@@ -153,9 +150,8 @@ export default function Admin() {
     });
   };
 
-  const checkin = (rsvpId: string, aksi: "lunas" | "belum" | "nodatang") =>
-    run(async () => {
-      const r = db.rsvps.find((x: any) => x.id === rsvpId);
+  const checkin = (rsvpId: string, aksi: "lunas" | "belum" | "nodatang") =>run(async () => {
+      const r = db.rsvps.find((x: any) =>x.id === rsvpId);
       if (!r) return;
       const nominal = hargaSekali(r.posisi || "");
       const nominalStr = nominal.toLocaleString("id-ID");
@@ -188,7 +184,7 @@ export default function Admin() {
     const alasan = prompt("Alasan void (hanya terlihat admin):");
     if (alasan === null) return;
     await run(async () => {
-      const r = db.rsvps.find((x: any) => x.id === rsvpId);
+      const r = db.rsvps.find((x: any) =>x.id === rsvpId);
       await adminUpdate("rsvps", rsvpId, { status: "cancelled" });
       await adminInsert("txs", {
         user_id: r.userId, label: "Tunggakan di-void admin", rupiah: 0,
@@ -197,11 +193,10 @@ export default function Admin() {
     });
   };
 
-  const tambahWalkin = () =>
-    run(async () => {
+  const tambahWalkin = () =>run(async () => {
       if (!jadwal || !walkinUser) return alert("Pilih pemain dulu");
       if (jadwal.status === "full_booked" || jadwal.status === "tutup") return alert("Jadwal tutup/full booked");
-      if (roster.some((r: any) => r.userId === walkinUser)) return alert("Pemain ini sudah ada di list");
+      if (roster.some((r: any) =>r.userId === walkinUser)) return alert("Pemain ini sudah ada di list");
       if (roster.length >= kuotaAktif(jadwal)) return alert("Kuota sudah penuh");
       if (roster.filter((r: any) => (r.posisi || "Depan") === walkinPosisi).length >= quotaPosisi(jadwal, walkinPosisi)) return alert(`Slot ${walkinPosisi} penuh`);
       const w = walletOf(db, walkinUser);
@@ -234,23 +229,23 @@ export default function Admin() {
   const exportPemain = () => {
     const rows = db.users.map((u: any) => {
       const w = walletOf(db, u.id);
-      const main = db.rsvps.filter((r: any) => r.userId === u.id && r.status !== "cancelled").length;
+      const main = db.rsvps.filter((r: any) =>r.userId === u.id && r.status !== "cancelled").length;
       return [u.nama, u.wa, u.email || "", u.role, u.status, u.is_member ? "Member" : "Non-member", w.paket, w.reguler, w.paket_gk, w.reguler_gk, totalTunggakanRp(db, u.id), main];
     });
     downloadCSV(`pemain-${today()}.csv`, ["Nama", "WA", "Email", "Role", "Status", "Member", "Kredit Paket", "Kredit Reguler", "Kredit Paket GK", "Kredit Reguler GK", "Tunggakan Rp", "Total Ikut"], rows);
   };
 
-  const jadwal = db.schedules.find((s: any) => s.id === jadwalId) || db.schedules.slice().sort((a: any, b: any) => a.tanggal.localeCompare(b.tanggal))[0];
+  const jadwal = db.schedules.find((s: any) =>s.id === jadwalId) || db.schedules.slice().sort((a: any, b: any) =>a.tanggal.localeCompare(b.tanggal))[0];
   const roster = jadwal ? listAktif(db, jadwal.id) : [];
 
   const salinWA = () => {
     if (!jadwal) return;
     const t = buildWAList(
       jadwal,
-      (p) => quotaPosisi(jadwal, p as any),
-      (p) => roster.filter((r: any) => (r.posisi || "Depan") === p).map((r: any) => namaOf(r.userId)),
+      (p) =>quotaPosisi(jadwal, p as any),
+      (p) =>roster.filter((r: any) => (r.posisi || "Depan") === p).map((r: any) =>namaOf(r.userId)),
     );
-    const done = () => alert("Template WA tersalin! Paste ke grup ✅");
+    const done = () =>alert("Template WA tersalin! Paste ke grup ");
     if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t).then(done).catch(() => { prompt("Copy manual:", t); });
     else prompt("Copy manual:", t);
   };
@@ -258,9 +253,9 @@ export default function Admin() {
   const exportJadwal = (denganTim: boolean) => {
     if (!jadwal) return;
     const timMap: Record<string, string> = {};
-    if (denganTim && acak) Object.entries(acak).forEach(([tm, arr]) => arr.forEach((p) => { timMap[p.nama] = tm; }));
+    if (denganTim && acak) Object.entries(acak).forEach(([tm, arr]) =>arr.forEach((p) => { timMap[p.nama] = tm; }));
     const rows = roster.map((r: any, i: number) => {
-      const u = db.users.find((x: any) => x.id === r.userId);
+      const u = db.users.find((x: any) =>x.id === r.userId);
       const st = r.status === "confirmed_lunas" ? "Lunas" : r.status === "confirmed_langsung" ? "Bayar di tempat" : r.status === "wajib_bayar" ? "Wajib bayar" : "Utang";
       const base: (string | number)[] = [i + 1, u?.nama || "", u?.wa || "", r.posisi || "", st];
       if (denganTim) base.push(timMap[u?.nama || ""] || "");
@@ -276,43 +271,43 @@ export default function Admin() {
     setAcak(acakTim(peserta));
   };
 
-  const pendings = db.users.filter((u: any) => u.status === "pending");
-  const klaims = db.txs.filter((t: any) => t.status === "pending");
+  const pendings = db.users.filter((u: any) =>u.status === "pending");
+  const klaims = db.txs.filter((t: any) =>t.status === "pending");
 
   return (
     <div>
       <div className="section-title">
-        <h2 style={{ margin: "4px 0" }}>🛠️ Panel Admin</h2>
+        <h2 style={{ margin: "4px 0" }}>Panel Admin</h2>
         <div className="row">
-          <Link href="/admin/jadwal"><button className="btn small">📅 Kelola Jadwal</button></Link>
+          <Link href="/admin/jadwal"><button className="btn small">Kelola Jadwal</button></Link>
           <Link href="/admin/keuangan"><button className="btn small">💰 Keuangan & PL</button></Link>
         </div>
       </div>
       <p className="muted">Semua kerjaan lapangan cukup dari HP di halaman ini.</p>
-      {busy && <div className="banner info">⏳ Memproses...</div>}
+      {busy && <div className="banner info">Memproses...</div>}
 
       <div className="card">
-        <h3>✅ Approve pendaftar <span className="badge blue">{pendings.length}</span></h3>
+        <h3>Approve pendaftar <span className="badge blue">{pendings.length}</span></h3>
         {pendings.length === 0 && <p className="muted">Tidak ada antrian. Santai ☕</p>}
         {pendings.map((u: any) => (
           <div key={u.id} className="row" style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
             <div style={{ flex: 1 }}><b style={{ fontSize: 17 }}>{u.nama}</b><br /><small className="muted">{u.wa} • {u.email}</small></div>
-            <button className="btn small" disabled={busy} onClick={() => approve(u.id, true)}>Approve ✅</button>
-            <button className="btn danger small" disabled={busy} onClick={() => approve(u.id, false)}>Tolak</button>
+            <button className="btn small" disabled={busy} onClick={() =>approve(u.id, true)}>Approve </button>
+            <button className="btn danger small" disabled={busy} onClick={() =>approve(u.id, false)}>Tolak</button>
           </div>
         ))}
       </div>
 
       <div className="card">
-        <h3>💳 Verifikasi pembayaran <span className="badge yellow">{klaims.length}</span></h3>
+        <h3>Verifikasi pembayaran <span className="badge yellow">{klaims.length}</span></h3>
         {klaims.length === 0 && <p className="muted">Tidak ada klaim menunggu.</p>}
         {klaims.map((t: any) => (
           <div key={t.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
-            <b>{namaOf(t.userId)}</b> — Paket {t.paket}{t.isGk ? " (harga GK 🧤)" : ""} (Rp{(t.rupiah || 0).toLocaleString("id-ID")}) via <span className="badge gray">{t.metode}</span>
+            <b>{namaOf(t.userId)}</b> — Paket {t.paket}{t.isGk ? " (harga GK )" : ""} (Rp{(t.rupiah || 0).toLocaleString("id-ID")}) via <span className="badge gray">{t.metode}</span>
             <br /><small className="muted">{t.catatan || ""} {t.bukti ? `• Bukti: ${t.bukti}` : ""} • {String(t.tanggal).slice(0, 16).replace("T", " ")}</small>
             <div className="row" style={{ marginTop: 6 }}>
-              <button className="btn small" disabled={busy} onClick={() => verifKlaim(t.id, true)}>Setujui ✅</button>
-              <button className="btn danger small" disabled={busy} onClick={() => verifKlaim(t.id, false)}>Tolak</button>
+              <button className="btn small" disabled={busy} onClick={() =>verifKlaim(t.id, true)}>Setujui </button>
+              <button className="btn danger small" disabled={busy} onClick={() =>verifKlaim(t.id, false)}>Tolak</button>
             </div>
           </div>
         ))}
@@ -321,13 +316,13 @@ export default function Admin() {
       <div className="card">
         <h3>👥 Roster per tanggal</h3>
         <select value={jadwal?.id || ""} disabled={busy} onChange={(e) => { setJadwalId(e.target.value); setAcak(null); }}>
-          {db.schedules.slice().sort((a: any, b: any) => a.tanggal.localeCompare(b.tanggal)).map((s: any) => (
+          {db.schedules.slice().sort((a: any, b: any) =>a.tanggal.localeCompare(b.tanggal)).map((s: any) => (
             <option key={s.id} value={s.id}>{s.tanggal} {s.jam} — {(STATUS_LABEL[s.status] || s.status)} ({listAktif(db, s.id).length}/{kuotaAktif(s)})</option>
           ))}
         </select>
         {jadwal && (
           <div>
-            <p className="muted"><small>📍 {jadwal.lokasi} • Batas tarik list: H-2</small></p>
+            <p className="muted"><small> {jadwal.lokasi} • Batas tarik list: H-2</small></p>
             {POSISI_MAIN.map((p) => {
               const arr = roster.filter((r: any) => (r.posisi || "Depan") === p);
               return (
@@ -338,18 +333,18 @@ export default function Admin() {
                       <div style={{ flex: 1 }}>
                         <b>{namaOf(r.userId)}</b>{" "}
                         <span className={`badge ${r.status === "confirmed_lunas" ? "green" : r.status === "confirmed_langsung" ? "blue" : r.status === "no_show" ? "gray" : "red"}`}>
-                          {r.status === "confirmed_lunas" ? "✅ Lunas" : r.status === "confirmed_langsung" ? "💵 Di tempat" : r.status === "no_show" ? "🚫 No-show" : r.status === "wajib_bayar" ? "🔒 Wajib bayar" : "⏳ Utang"}
+                          {r.status === "confirmed_lunas" ? " Lunas" : r.status === "confirmed_langsung" ? " Di tempat" : r.status === "no_show" ? " No-show" : r.status === "wajib_bayar" ? " Wajib bayar" : " Utang"}
                         </span>
-                        {r.is_alihan && <span className="badge yellow" style={{ marginLeft: 6 }}>🔄 Alihan</span>}
+                        {r.is_alihan && <span className="badge yellow" style={{ marginLeft: 6 }}>Alihan</span>}
                       </div>
                       {(r.status === "confirmed_langsung" || r.status === "confirmed_utang" || r.status === "wajib_bayar") && (
                         <>
-                          <button className="btn small" disabled={busy} onClick={() => checkin(r.id, "lunas")}>Lunas ✅</button>
-                          {(r.status !== "wajib_bayar") && <button className="btn secondary small" disabled={busy} onClick={() => checkin(r.id, "belum")}>Belum bayar</button>}
-                          {(r.status === "confirmed_utang" || r.status === "wajib_bayar") && <button className="btn secondary small" disabled={busy} onClick={() => voidTunggakan(r.id)}>Void</button>}
+                          <button className="btn small" disabled={busy} onClick={() =>checkin(r.id, "lunas")}>Lunas </button>
+                          {(r.status !== "wajib_bayar") && <button className="btn secondary small" disabled={busy} onClick={() =>checkin(r.id, "belum")}>Belum bayar</button>}
+                          {(r.status === "confirmed_utang" || r.status === "wajib_bayar") && <button className="btn secondary small" disabled={busy} onClick={() =>voidTunggakan(r.id)}>Void</button>}
                         </>
                       )}
-                      {r.status === "confirmed_lunas" && <button className="btn secondary small" disabled={busy} onClick={() => checkin(r.id, "nodatang")}>Tidak datang</button>}
+                      {r.status === "confirmed_lunas" && <button className="btn secondary small" disabled={busy} onClick={() =>checkin(r.id, "nodatang")}>Tidak datang</button>}
                       {r.is_alihan && r.alih_dari && <small className="muted" style={{ marginLeft: 6 }}>dari {namaOf(r.alih_dari)}</small>}
                     </div>
                   ))}
@@ -358,7 +353,7 @@ export default function Admin() {
               );
             })}
             <div className="card" style={{ background: "#211a08", borderColor: "var(--gold-deep)" }}>
-              <h4>🔄 Alih Slot (admin gantikan pemain)</h4>
+              <h4>Alih Slot (admin gantikan pemain)</h4>
               <p className="muted"><small>Pemain out hubungi admin → admin pilih slot & pengganti (posisi sama, maks 1x oper, deposit hangus privat).</small></p>
               <select value={alihText} onChange={(e) => { setAlihText(e.target.value); setAlihPickAlih(""); }} style={{ marginBottom: 6 }}>
                 <option value="">— Pilih slot yang mau dialihkan —</option>
@@ -367,9 +362,9 @@ export default function Admin() {
                 ))}
               </select>
               {alihText && (
-                <select value={alihPickAlih} onChange={(e) => setAlihPickAlih(e.target.value)} style={{ marginBottom: 6 }}>
+                <select value={alihPickAlih} onChange={(e) =>setAlihPickAlih(e.target.value)} style={{ marginBottom: 6 }}>
                   <option value="">— Pilih pengganti —</option>
-                  {db.users.filter((u: any) => u.status === "approved" && !roster.some((x: any) => x.userId === u.id)).map((u: any) => (
+                  {db.users.filter((u: any) =>u.status === "approved" && !roster.some((x: any) =>x.userId === u.id)).map((u: any) => (
                     <option key={u.id} value={u.id}>{u.nama} ({u.wa})</option>
                   ))}
                 </select>
@@ -377,7 +372,7 @@ export default function Admin() {
               <button className="btn" disabled={busy || !alihText || !alihPickAlih} onClick={async () => {
                 const rId = alihText; const gId = alihPickAlih;
                 if (!rId || !gId) return;
-                const r = roster.find((x: any) => x.id === rId);
+                const r = roster.find((x: any) =>x.id === rId);
                 const hasil = await supa().rpc("rpc_alih_slot", { p_rsvp_id: rId, p_pengganti: gId });
                 if (hasil.error) return alert(hasil.error.message);
                 const d: any = hasil.data;
@@ -387,23 +382,23 @@ export default function Admin() {
               }}>Alihkan Slot ➜</button>
             </div>
             <div className="row" style={{ marginTop: 8 }}>
-              <button className="btn secondary small" onClick={salinWA}>📋 Salin ke WA</button>
-              <button className="btn secondary small" onClick={() => exportJadwal(false)}>⬇️ CSV Jadwal</button>
-              <button className="btn secondary small" onClick={() => window.print()}>🖨️ Cetak / PDF</button>
+              <button className="btn secondary small" onClick={salinWA}>Salin ke WA</button>
+              <button className="btn secondary small" onClick={() =>exportJadwal(false)}>⬇ CSV Jadwal</button>
+              <button className="btn secondary small" onClick={() =>window.print()}>🖨 Cetak / PDF</button>
               <button className="btn warn small" onClick={jalankanAcak}>🎲 Acak 4 Tim</button>
             </div>
             <div className="card" style={{ background: "#211a08", borderColor: "var(--gold-deep)" }}>
               <h4>🚶 Walk-in H-day (datang tanpa isi list)</h4>
               <div className="grid2">
-                <select value={walkinUser} onChange={(e) => setWalkinUser(e.target.value)}>
+                <select value={walkinUser} onChange={(e) =>setWalkinUser(e.target.value)}>
                   <option value="">— Pilih pemain —</option>
-                  {db.users.filter((u: any) => u.status === "approved" && !roster.some((r: any) => r.userId === u.id)).map((u: any) => <option key={u.id} value={u.id}>{u.nama} (P{walletOf(db, u.id).paket}/R{walletOf(db, u.id).reguler})</option>)}
+                  {db.users.filter((u: any) =>u.status === "approved" && !roster.some((r: any) =>r.userId === u.id)).map((u: any) => <option key={u.id} value={u.id}>{u.nama} (P{walletOf(db, u.id).paket}/R{walletOf(db, u.id).reguler})</option>)}
                 </select>
-                <select value={walkinPosisi} onChange={(e) => setWalkinPosisi(e.target.value as any)}>
+                <select value={walkinPosisi} onChange={(e) =>setWalkinPosisi(e.target.value as any)}>
                   {POSISI_MAIN.map((p) => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
-              <select value={walkinCara} onChange={(e) => setWalkinCara(e.target.value as any)}>
+              <select value={walkinCara} onChange={(e) =>setWalkinCara(e.target.value as any)}>
                 <option value="potong">Potong 1 kredit pemain</option>
                 <option value="cash">Lunas cash di tempat (GK 15rb / lainnya 25rb)</option>
               </select>
@@ -415,7 +410,7 @@ export default function Admin() {
                 {Object.entries(acak).map(([tm, arr]) => (
                   <p key={tm}><b>Tim {tm} ({arr.length})</b><br /><small>{arr.map((p) => `${p.nama} (${p.posisi})`).join(", ")}</small></p>
                 ))}
-                <button className="btn secondary small" onClick={() => exportJadwal(true)}>⬇️ CSV + kolom Tim</button>
+                <button className="btn secondary small" onClick={() =>exportJadwal(true)}>⬇ CSV + kolom Tim</button>
               </div>
             )}
           </div>
@@ -424,56 +419,56 @@ export default function Admin() {
 
       <div className="card">
         <h3>➕ Kredit manual (cash / bantuan / koreksi)</h3>
-        <p className="muted"><small>Pilih pemain dulu (ketik untuk cari), baru tombol aksi muncul. Untuk cash tanpa klaim / koreksi / ⭐.</small></p>
+        <p className="muted"><small>Pilih pemain dulu (ketik untuk cari), baru tombol aksi muncul. Untuk cash tanpa klaim / koreksi / .</small></p>
         <input
           list="manual-pemain-list"
           placeholder="🔍 Ketik nama atau pilih dari daftar..."
           value={manualText}
-          onChange={(e) => setManualText(e.target.value)}
+          onChange={(e) =>setManualText(e.target.value)}
         />
         <datalist id="manual-pemain-list">
-          {db.users.filter((u: any) => u.status === "approved").map((u: any) => (
+          {db.users.filter((u: any) =>u.status === "approved").map((u: any) => (
             <option key={u.id} value={manualLabel(u)} />
           ))}
         </datalist>
         {(() => {
-          const u = db.users.find((x: any) => x.status === "approved" && (manualLabel(x) === manualText || x.nama === manualText));
+          const u = db.users.find((x: any) =>x.status === "approved" && (manualLabel(x) === manualText || x.nama === manualText));
           if (!u) return <p className="muted"><small>{manualText ? "Nama tidak cocok — pilih dari daftar." : "Belum ada pemain dipilih."}</small></p>;
           const w = walletOf(db, u.id);
           return (
             <div className="card" style={{ background: "#211a08", borderColor: "var(--gold-deep)" }}>
               <div className="section-title">
-                <div><b style={{ fontSize: 18 }}>{u.nama}</b> {u.is_member && <span className="badge yellow">⭐ Member</span>}<br />
+                <div><b style={{ fontSize: 18 }}>{u.nama}</b> {u.is_member && <span className="badge yellow">Member</span>}<br />
                 <small className="muted">{u.wa} • P{w.paket} / R{w.reguler} / PGK{w.paket_gk} / RGK{w.reguler_gk}</small></div>
-                <button className="btn secondary small" onClick={() => setManualText("")}>✖ Ganti</button>
+                <button className="btn secondary small" onClick={() =>setManualText("")}>✖ Ganti</button>
               </div>
               <div className="row" style={{ marginTop: 8 }}>
-                <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "1x")}>+1 cash</button>
-                <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "4x")}>+4 cash</button>
-                <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "1x", true)}>+1 GK</button>
-                <button className="btn secondary small" disabled={busy} onClick={() => manualTopup(u.id, "4x", true)}>+4 GK</button>
+                <button className="btn secondary small" disabled={busy} onClick={() =>manualTopup(u.id, "1x")}>+1 cash</button>
+                <button className="btn secondary small" disabled={busy} onClick={() =>manualTopup(u.id, "4x")}>+4 cash</button>
+                <button className="btn secondary small" disabled={busy} onClick={() =>manualTopup(u.id, "1x", true)}>+1 GK</button>
+                <button className="btn secondary small" disabled={busy} onClick={() =>manualTopup(u.id, "4x", true)}>+4 GK</button>
               </div>
               <div className="row" style={{ marginTop: 6 }}>
-                <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler")}>−1 R</button>
-                <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "paket")}>−1 P</button>
-                <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "paket_gk")}>−1 PGK</button>
-                <button className="btn secondary small" disabled={busy} onClick={() => kurangiKredit(u.id, "reguler_gk")}>−1 RGK</button>
-                <button className="btn secondary small" disabled={busy} onClick={() => toggleMember(u.id)}>{u.is_member ? "Cabut ⭐" : "Jadi ⭐"}</button>
+                <button className="btn secondary small" disabled={busy} onClick={() =>kurangiKredit(u.id, "reguler")}>−1 R</button>
+                <button className="btn secondary small" disabled={busy} onClick={() =>kurangiKredit(u.id, "paket")}>−1 P</button>
+                <button className="btn secondary small" disabled={busy} onClick={() =>kurangiKredit(u.id, "paket_gk")}>−1 PGK</button>
+                <button className="btn secondary small" disabled={busy} onClick={() =>kurangiKredit(u.id, "reguler_gk")}>−1 RGK</button>
+                <button className="btn secondary small" disabled={busy} onClick={() =>toggleMember(u.id)}>{u.is_member ? "Cabut " : "Jadi "}</button>
               </div>
             </div>
           );
         })()}
-        <h4 style={{ marginTop: 12 }}>🎗️ Kredit bantuan (privat)</h4>
+        <h4 style={{ marginTop: 12 }}>Kredit bantuan (privat)</h4>
         <div className="grid2">
-          <select value={bantuanUser} onChange={(e) => setBantuanUser(e.target.value)}>
+          <select value={bantuanUser} onChange={(e) =>setBantuanUser(e.target.value)}>
             <option value="">— Pilih pemain —</option>
-            {db.users.filter((u: any) => u.status === "approved").map((u: any) => <option key={u.id} value={u.id}>{u.nama}</option>)}
+            {db.users.filter((u: any) =>u.status === "approved").map((u: any) => <option key={u.id} value={u.id}>{u.nama}</option>)}
           </select>
-          <select value={bantuanKredit} onChange={(e) => setBantuanKredit(e.target.value)}>
+          <select value={bantuanKredit} onChange={(e) =>setBantuanKredit(e.target.value)}>
             <option value="1">+1 kredit</option><option value="2">+2 kredit</option><option value="4">+4 kredit</option>
           </select>
         </div>
-        <input placeholder="Alasan privat (hanya admin yang lihat)" value={bantuanAlasan} onChange={(e) => setBantuanAlasan(e.target.value)} />
+        <input placeholder="Alasan privat (hanya admin yang lihat)" value={bantuanAlasan} onChange={(e) =>setBantuanAlasan(e.target.value)} />
         <button className="btn" disabled={busy} onClick={beriBantuan}>Beri Kredit Bantuan</button>
       </div>
 
@@ -482,16 +477,16 @@ export default function Admin() {
           <h3>👥 Database pemain ({db.users.length})</h3>
         </div>
         <div className="row">
-          <button className="btn secondary small" onClick={exportPemain}>⬇️ Export Excel (CSV)</button>
-          <button className="btn secondary small" onClick={() => window.print()}>🖨️ Cetak / PDF</button>
+          <button className="btn secondary small" onClick={exportPemain}>⬇ Export Excel (CSV)</button>
+          <button className="btn secondary small" onClick={() =>window.print()}>🖨 Cetak / PDF</button>
         </div>
         <div className="tblwrap"><table>
           <thead><tr><th>Nama</th><th>WA</th><th>Status</th><th>Member</th><th>Kredit</th><th>Tunggakan</th></tr></thead>
           <tbody>{db.users.map((u: any) => (
             <tr key={u.id}><td><b>{u.nama}</b></td><td>{u.wa}</td><td><span className="badge blue">{u.status}</span></td>
-              <td>{u.is_member ? <span className="badge yellow">⭐ Member</span> : <span className="badge gray">Non</span>}</td>
+              <td>{u.is_member ? <span className="badge yellow">Member</span> : <span className="badge gray">Non</span>}</td>
               <td>P{walletOf(db, u.id).paket}/R{walletOf(db, u.id).reguler}</td>
-              <td>{tunggakanOf(db, u.id).length > 0 ? <span className="badge red">🔒 {tunggakanOf(db, u.id).length}x</span> : "-"}</td></tr>
+              <td>{tunggakanOf(db, u.id).length > 0 ? <span className="badge red"> {tunggakanOf(db, u.id).length}x</span> : "-"}</td></tr>
           ))}</tbody>
         </table></div>
       </div>
@@ -501,10 +496,10 @@ export default function Admin() {
         <div className="tblwrap"><table>
           <thead><tr><th>Waktu</th><th>Pemain</th><th>Keterangan</th><th>Rp</th><th></th></tr></thead>
           <tbody>{db.txs.slice().reverse().slice(0, 30).map((t: any) => (
-            <tr key={t.id}><td>{String(t.tanggal).slice(5, 16).replace("T", " ")}</td><td>{db.users.find((u: any) => u.id === t.userId)?.nama}</td>
-              <td>{t.metode === "bantuan_privat" ? "🎗️ Kredit admin (privat)" : t.label} <span className="badge gray">{t.metode}</span>{t.privateNote ? <><br /><small className="muted">🔒 {t.privateNote}</small></> : ""}</td>
+            <tr key={t.id}><td>{String(t.tanggal).slice(5, 16).replace("T", " ")}</td><td>{db.users.find((u: any) =>u.id === t.userId)?.nama}</td>
+              <td>{t.metode === "bantuan_privat" ? " Kredit admin (privat)" : t.label} <span className="badge gray">{t.metode}</span>{t.privateNote ? <><br /><small className="muted"> {t.privateNote}</small></> : ""}</td>
               <td>{(t.rupiah || 0).toLocaleString("id-ID")}</td>
-              <td><button className="btn danger small" disabled={busy} onClick={() => hapusTx(t.id)}>Hapus</button></td></tr>
+              <td><button className="btn danger small" disabled={busy} onClick={() =>hapusTx(t.id)}>Hapus</button></td></tr>
           ))}</tbody>
         </table></div>
       </div>

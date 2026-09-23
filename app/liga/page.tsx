@@ -15,7 +15,7 @@ export default function LigaRegistrasi() {
   const [edTanggal,setEdTanggal]=useState(""); const [edLabel,setEdLabel]=useState("");
   const reload=()=>fetchAll().then(setDb).catch((e:any)=>setErr(e.message));
   useEffect(()=>{reload();},[]);
-  if(err) return <div className="card"><div className="banner err">⚠️ {err}</div></div>;
+  if(err) return <div className="card"><div className="banner err"> {err}</div></div>;
   if(!db) return <div className="card"><p>Memuat...</p></div>;
   const me=db.users.find((u:any)=>u.id===db.sessionId);
   const isAdmin=me?.role==="admin";
@@ -28,7 +28,7 @@ export default function LigaRegistrasi() {
   const canLock = !locked && pool.length===0 && (["A","B","C","D"] as const).every((t:any)=> (teams[t]||[]).length===7);
 
   // helpers
-  const countPool = (pos:string)=> pool.filter((p:any)=>p.posisi===pos).length;
+  const countPool = (pos:string)=>pool.filter((p:any)=>p.posisi===pos).length;
   const sudahDaftar = me ? (pool.some((p:any)=>p.userId===me.id) || ["A","B","C","D"].some(t=> (teams[t]||[]).some((m:any)=>m.userId===me.id))) : false;
   const poolPenuh = POOL_QUOTA.GK===countPool("GK") && POOL_QUOTA.Belakang===countPool("Belakang") && POOL_QUOTA.Tengah===countPool("Tengah") && POOL_QUOTA.Depan===countPool("Depan");
   const timPenuh = (t:string)=> (teams[t]||[]).length>=7;
@@ -44,17 +44,17 @@ export default function LigaRegistrasi() {
     return need;
   })();
 
-  const daftar = ()=> run(async()=>{
+  const daftar = ()=>run(async()=>{
     if(!me) return alert("Login dulu ya");
     if(me.status!=="approved") return alert("Akunmu belum di-approve admin");
-    if(!isMember) return alert("Liga khusus ⭐ Member");
+    if(!isMember) return alert("Liga khusus  Member");
     if(locked) return alert("Skuad sudah dikunci");
     if(sudahDaftar) return alert("Kamu sudah terdaftar (pool/tim)");
     if(countPool(posisi) >= POOL_QUOTA[posisi as keyof typeof POOL_QUOTA]) return alert(`Pool ${posisi} sudah penuh (${POOL_QUOTA[posisi as keyof typeof POOL_QUOTA]})`);
     await adminInsert("league_members", { team: null, user_id: me.id, posisi });
   });
 
-  const kocok = ()=> run(async()=>{
+  const kocok = ()=>run(async()=>{
     if(locked) return alert("Sudah dikunci, tidak bisa kocok ulang");
     // kumpulkan pool per posisi, shuffle, bagi round-robin ber-cap
     const cap:Record<string,number> = { GK:1, Belakang:2, Tengah:2, Depan:2 };
@@ -114,7 +114,7 @@ export default function LigaRegistrasi() {
     alert("Kocok selesai");
   });
 
-  const buatEdisi = ()=> run(async()=>{
+  const buatEdisi = ()=>run(async()=>{
     if(!edTanggal) return alert("Pilih tanggal edisi dulu");
     if(editions.length>=6) return alert("Maks 6 edisi");
     const label=edLabel || `Edisi ${edTanggal}`;
@@ -130,15 +130,15 @@ export default function LigaRegistrasi() {
   });
 
   const hapusEdisi=(id:string)=>{ if(!confirm("Hapus edisi + 6 laganya?")) return; run(async()=>{ await supa().from("league_editions").delete().eq("id",id); }); };
-  const toggleLock=()=>{ if(!locked && !confirm("Kunci skuad? Setelah dikunci tidak bisa kocok ulang.")) return; run(()=> adminUpdate("league_meta",1,{ locked: !locked },"id").then(()=>{})); };
+  const toggleLock=()=>{ if(!locked && !confirm("Kunci skuad? Setelah dikunci tidak bisa kocok ulang.")) return; run(()=>adminUpdate("league_meta",1,{ locked: !locked },"id").then(()=>{})); };
   const keluarkan=(t:string,userId:string)=>{
     const targetNama=db.users.find((u:any)=>u.id===userId)?.nama||userId;
     run(async()=>{
       // cari future edisi untuk refund logic (sama seperti sebelumnya, disederhanakan: sebelum lock auto refund)
-      const future = db.schedules.filter((s:any)=> s.is_liga && s.edition_id).filter((s:any)=>{
+      const future = db.schedules.filter((s:any)=>s.is_liga && s.edition_id).filter((s:any)=>{
         const ed=db.editions.find((e:any)=>e.id===s.edition_id);
-        return ed && ed.tanggal >= new Date().toISOString().slice(0,10) && db.rsvps.some((r:any)=> r.scheduleId===s.id && r.userId===userId && r.status!=="cancelled");
-      }).map((s:any)=> db.rsvps.find((r:any)=> r.scheduleId===s.id && r.userId===userId));
+        return ed && ed.tanggal >= new Date().toISOString().slice(0,10) && db.rsvps.some((r:any)=>r.scheduleId===s.id && r.userId===userId && r.status!=="cancelled");
+      }).map((s:any)=>db.rsvps.find((r:any)=>r.scheduleId===s.id && r.userId===userId));
       for(const r of future){
         if(!r) continue;
         const s=db.schedules.find((x:any)=>x.id===r.scheduleId);
@@ -161,13 +161,13 @@ export default function LigaRegistrasi() {
 
   return (
     <div>
-      <h2 style={{ margin:"4px 0" }}>📝 Registrasi KIM x DnA Health League {locked && <span className="badge red">🔒 Skuad dikunci</span>}</h2>
-      <p className="muted">Khusus ⭐ Member • Pool: GK 4, Belakang 8, Tengah 8, Depan 8 • Maks 6 hari.</p>
-      {me && !isMember && <div className="banner warn">Liga khusus member. <b>Beli paket 90rb di Top-Up</b> untuk jadi member.</div>}
+      <h2 style={{ margin:"4px 0" }}>Registrasi KIM x DnA Health League {locked && <span className="badge red">Skuad dikunci</span>}</h2>
+      <p className="muted">Khusus  Member • Pool: GK 4, Belakang 8, Tengah 8, Depan 8 • Maks 6 hari.</p>
+      {me && !isMember && <div className="banner warn">Liga khusus member. <b>Beli paket 90rb di Top-Up</b>untuk jadi member.</div>}
 
       {!locked && !sudahDaftar && (
         <div className="card">
-          <h3>📝 Daftar Pool (pilih posisi)</h3>
+          <h3>Daftar Pool (pilih posisi)</h3>
           <div className="grid2">
             <select value={posisi} onChange={(e)=>setPosisi(e.target.value)}>{Object.keys(POOL_QUOTA).map(p=> <option key={p} value={p}>{p} — {countPool(p)}/{POOL_QUOTA[p as keyof typeof POOL_QUOTA]} {countPool(p)>=POOL_QUOTA[p as keyof typeof POOL_QUOTA]?"Penuh":""}</option>)}</select>
             <button className="btn" disabled={busy || countPool(posisi) >= POOL_QUOTA[posisi as keyof typeof POOL_QUOTA]} onClick={daftar}>Gabung Pool {posisi} ➜</button>
@@ -175,15 +175,15 @@ export default function LigaRegistrasi() {
           <p className="muted"><small>Setelah daftar, tunggu admin kocok. Posisi penuh tidak bisa dipilih lagi.</small></p>
         </div>
       )}
-      {sudahDaftar && <div className="card" style={{ background:"#211a08", borderColor:"var(--gold-deep)" }}><h3>✅ Kamu sudah terdaftar</h3><p>Posisi: {(pool.find((p:any)=>p.userId===me.id)?.posisi) || (Object.values(db.teams).flat() as any[]).find((m:any)=>m.userId===me.id)?.posisi} • Menunggu kocok / lihat Klasemen.</p></div>}
+      {sudahDaftar && <div className="card" style={{ background:"#211a08", borderColor:"var(--gold-deep)" }}><h3>Kamu sudah terdaftar</h3><p>Posisi: {(pool.find((p:any)=>p.userId===me.id)?.posisi) || (Object.values(db.teams).flat() as any[]).find((m:any)=>m.userId===me.id)?.posisi} • Menunggu kocok / lihat Klasemen.</p></div>}
 
       <div className="card">
-        <h3>⏳ Pool — Belum Terbagi</h3>
+        <h3>Pool — Belum Terbagi</h3>
         <div className="grid2">
           {["GK","Belakang","Tengah","Depan"].map(pos=>(
             <div key={pos} style={{ border:"1px solid var(--line)", borderRadius:10, padding:8 }}>
               <b>{pos} {countPool(pos)}/{POOL_QUOTA[pos as keyof typeof POOL_QUOTA]}</b>
-              <p><small>{pool.filter((p:any)=>p.posisi===pos).map((p:any)=> db.users.find((u:any)=>u.id===p.userId)?.nama).join(", ") || "— kosong —"}</small></p>
+              <p><small>{pool.filter((p:any)=>p.posisi===pos).map((p:any)=>db.users.find((u:any)=>u.id===p.userId)?.nama).join(", ") || "— kosong —"}</small></p>
             </div>
           ))}
         </div>
@@ -195,7 +195,7 @@ export default function LigaRegistrasi() {
             {Object.keys(kekurangan).length>0 && <div className="banner warn">Kekurangan: {Object.entries(kekurangan).map(([k,v]:any)=>`${k} −${v}`).join(", ")}</div>}
           </div>
         )}
-        {isAdmin && locked && <div className="banner info">🔒 Skuad dikunci — kocok dinonaktifkan. Hanya ubah manual/k Keluarkan.</div>}
+        {isAdmin && locked && <div className="banner info">Skuad dikunci — kocok dinonaktifkan. Hanya ubah manual/k Keluarkan.</div>}
       </div>
 
       <div className="grid2">
@@ -204,7 +204,7 @@ export default function LigaRegistrasi() {
             <b>{teamNama(t)}</b> <span className="badge blue">{(teams[t]||[]).length}/7</span>
             {(teams[t]||[]).map((m:any,i:number)=>{
               const u=db.users.find((x:any)=>x.id===m.userId);
-              return <p key={i}><span className="badge gray">{m.posisi}</span> {u?.nama||m.userId} {isAdmin && <button className="btn secondary small" disabled={busy} onClick={()=> keluarkan(t,m.userId)}>Keluarkan</button>}</p>;
+              return <p key={i}><span className="badge gray">{m.posisi}</span> {u?.nama||m.userId} {isAdmin && <button className="btn secondary small" disabled={busy} onClick={()=>keluarkan(t,m.userId)}>Keluarkan</button>}</p>;
             })}
             {isAdmin && (teams[t]||[]).length<7 && (
               <div style={{ marginTop:6, display:"flex", gap:6 }}>
@@ -221,10 +221,10 @@ export default function LigaRegistrasi() {
         ))}
       </div>
 
-      {isAdmin && <div className="card"><button className="btn secondary" disabled={busy || (!locked && !canLock)} onClick={toggleLock} title={!locked && !canLock ? "Pool harus kosong & 4 tim penuh 7 orang" : ""}>{locked ? "🔓 Buka Kunci Skuad" : "🔒 Kunci Skuad (pool kosong + 4 tim penuh)"}</button> {!locked && !canLock && <small className="muted"> — Pool harus kosong & 4 tim 7 orang dulu.</small>}{locked && <small className="muted">Setelah dikunci hanya ubah manual/k Keluarkan.</small>}</div>}
+      {isAdmin && <div className="card"><button className="btn secondary" disabled={busy || (!locked && !canLock)} onClick={toggleLock} title={!locked && !canLock ? "Pool harus kosong & 4 tim penuh 7 orang" : ""}>{locked ? "🔓 Buka Kunci Skuad" : " Kunci Skuad (pool kosong + 4 tim penuh)"}</button> {!locked && !canLock && <small className="muted"> — Pool harus kosong & 4 tim 7 orang dulu.</small>}{locked && <small className="muted">Setelah dikunci hanya ubah manual/k Keluarkan.</small>}</div>}
 
       <div className="card">
-        <h3>🗓️ Edisi Liga — Jadwal & Pembayaran (1 edisi = 1 kredit)</h3>
+        <h3>🗓 Edisi Liga — Jadwal & Pembayaran (1 edisi = 1 kredit)</h3>
         {isAdmin && (
           <div style={{ border:"1px solid var(--line)", borderRadius:12, padding:12, marginBottom:10, background:"#211a08" }}>
             <div className="grid2">
@@ -239,15 +239,15 @@ export default function LigaRegistrasi() {
         {editions.length>0 && (
           <div style={{ maxHeight:520, overflowY:"auto" }}>
             {editions.map((ed:any)=>{
-              const s=db.schedules.find((x:any)=> x.is_liga && x.edition_id===ed.id);
-              const list=s? db.rsvps.filter((r:any)=> r.scheduleId===s.id && r.status!=="cancelled") : [];
-              const mine=s? list.find((r:any)=> r.userId===me?.id) : null;
+              const s=db.schedules.find((x:any)=>x.is_liga && x.edition_id===ed.id);
+              const list=s? db.rsvps.filter((r:any)=>r.scheduleId===s.id && r.status!=="cancelled") : [];
+              const mine=s? list.find((r:any)=>r.userId===me?.id) : null;
               const myTeams:string[]=["A","B","C","D"].filter((t:any)=> (teams[t]||[]).some((m:any)=>m.userId===me?.id) || pool.some((p:any)=>p.userId===me?.id && p.posisi));
               const isSkuad=myTeams.length>0;
               const myPos=(()=>{ for(const t of ["A","B","C","D"]){ const mem=(teams[t]||[]).find((x:any)=>x.userId===me?.id); if(mem) return mem.posisi; } const pp=pool.find((p:any)=>p.userId===me?.id); return pp?.posisi||"Depan"; })();
               return (
                 <div key={ed.id} style={{ border:"1px solid var(--line)", borderRadius:12, padding:12, margin:"10px 0", background:"#1e1e22" }}>
-                  <b>📅 {ed.label}</b> <span className="badge blue">{ed.tanggal}</span> {s && <span className={`badge ${s.status==="buka"?"green":"red"}`}>{s.status}</span>}
+                  <b> {ed.label}</b> <span className="badge blue">{ed.tanggal}</span> {s && <span className={`badge ${s.status==="buka"?"green":"red"}`}>{s.status}</span>}
                   {isAdmin && <button className="btn danger small" style={{ marginLeft:8 }} onClick={()=>hapusEdisi(ed.id)}>Hapus</button>}
                   {!s ? <p className="muted"><small>Jadwal bayar belum ada.</small></p> : (
                     <>
@@ -255,11 +255,11 @@ export default function LigaRegistrasi() {
                       {!me ? <p className="muted"><small>Login dulu</small></p> : !isSkuad ? <div className="banner warn">Hanya yang sudah daftar pool/tim yang bisa konfirmasi edisi ini.</div> : (
                         !mine ? (
                           <div className="row">
-                            <button className="btn" disabled={busy} onClick={async()=>{ const { rsvp }=await import("../../lib/db"); try{ await rsvp(s.id, myPos, "deposit"); location.reload(); }catch(e:any){ alert(e.message); } }}>✅ {myPos} — Potong 1 Kredit</button>
-                            <button className="btn secondary" disabled={busy} onClick={async()=>{ const { rsvp }=await import("../../lib/db"); try{ await rsvp(s.id, myPos, "langsung"); location.reload(); }catch(e:any){ alert(e.message); } }}>💵 Cash ({myPos==="GK"?"15rb":"25rb"})</button>
+                            <button className="btn" disabled={busy} onClick={async()=>{ const { rsvp }=await import("../../lib/db"); try{ await rsvp(s.id, myPos, "deposit"); location.reload(); }catch(e:any){ alert(e.message); } }}> {myPos} — Potong 1 Kredit</button>
+                            <button className="btn secondary" disabled={busy} onClick={async()=>{ const { rsvp }=await import("../../lib/db"); try{ await rsvp(s.id, myPos, "langsung"); location.reload(); }catch(e:any){ alert(e.message); } }}>Cash ({myPos==="GK"?"15rb":"25rb"})</button>
                           </div>
                         ) : (
-                          <div><span className={`badge ${mine.status==="confirmed_lunas"?"green":"blue"}`}>{mine.status==="confirmed_lunas"?"✅ Lunas":"💵 Di tempat"} • {mine.posisi}</span></div>
+                          <div><span className={`badge ${mine.status==="confirmed_lunas"?"green":"blue"}`}>{mine.status==="confirmed_lunas"?" Lunas":" Di tempat"} • {mine.posisi}</span></div>
                         )
                       )}
                     </>

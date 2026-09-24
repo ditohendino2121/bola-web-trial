@@ -5,7 +5,7 @@ import {
   walletOf, listAktif, kuotaAktif, quotaPosisi,
   POSISI_MAIN, STATUS_LABEL, tunggakanOf, hargaSekali, totalTunggakanRp,
   langsungBelumLunas,
-  TARIF_KREDIT, nominalWallet, refundableWallet, totalBantuanGranted,
+  TARIF_KREDIT, nominalWallet, refundableWallet, totalBantuanGranted, totalMasuk,
 } from "../../lib/store";
 import { supa, fetchAll, adminUpdate, adminInsert, adminDelete } from "../../lib/db";
 import { downloadCSV, today, acakTim, buildWAList } from "../../lib/export";
@@ -306,9 +306,10 @@ export default function Admin() {
     .map((u: any) => {
       const w = walletOf(db, u.id);
       const r = refundableWallet(db, u.id);
+      const m = totalMasuk(db, u.id);
       const tung = totalTunggakanRp(db, u.id);
       const belumLunas = langsungBelumLunas(db, u.id).length;
-      return { u, w, ...r, tung, belumLunas, totalKredit: r.sisa.paket + r.sisa.reguler + r.sisa.paket_gk + r.sisa.reguler_gk };
+      return { u, w, ...r, masuk: m, tung, belumLunas, totalKredit: r.sisa.paket + r.sisa.reguler + r.sisa.paket_gk + r.sisa.reguler_gk };
     })
     .filter((x: any) => {
       if (!walletSearch) return true;
@@ -316,11 +317,11 @@ export default function Admin() {
       return x.u.nama.toLowerCase().includes(q) || x.u.wa.includes(q);
     })
     .sort((a: any, b: any) => b.nominal - a.nominal || b.totalKredit - a.totalKredit);
-  const walletTotal = walletRows.reduce((a: any, r: any) => ({ kredit: a.kredit + r.totalKredit, nominal: a.nominal + r.nominal, bantuan: a.bantuan + r.bantuanSisa }), { kredit: 0, nominal: 0, bantuan: 0 });
+  const walletTotal = walletRows.reduce((a: any, r: any) => ({ kredit: a.kredit + r.totalKredit, nominal: a.nominal + r.nominal, bantuan: a.bantuan + r.bantuanSisa, masukKredit: a.masukKredit + r.masuk.total, masukNominal: a.masukNominal + r.masuk.nominal }), { kredit: 0, nominal: 0, bantuan: 0, masukKredit: 0, masukNominal: 0 });
 
   const exportWallet = () => {
-    const rows = walletRows.map((r: any) => [r.u.nama, r.u.wa, r.w.paket, r.w.reguler, r.w.paket_gk, r.w.reguler_gk, r.totalKredit, r.bantuanSisa, r.nominal, r.tung, r.u.is_member ? "Member" : "Non-member"]);
-    downloadCSV(`wallet-${today()}.csv`, ["Nama","WA","P","R","PGK","RGK","Total kredit","Bantuan dikecualikan","Nominal refund Rp","Tunggakan Rp","Member"], rows);
+    const rows = walletRows.map((r: any) => [r.u.nama, r.u.wa, r.w.paket, r.w.reguler, r.w.paket_gk, r.w.reguler_gk, r.totalKredit, r.bantuanSisa, r.nominal, r.masuk.p, r.masuk.r, r.masuk.pgk, r.masuk.rgk, r.masuk.total, r.masuk.nominal, r.tung, r.u.is_member ? "Member" : "Non-member"]);
+    downloadCSV(`wallet-${today()}.csv`, ["Nama","WA","Sisa P","Sisa R","Sisa PGK","Sisa RGK","Sisa total","Bantuan dikecualikan","Nominal sisa Rp","Masuk P","Masuk R","Masuk PGK","Masuk RGK","Masuk total","Nominal masuk Rp","Tunggakan Rp","Member"], rows);
   };
 
   const refundPreview = (() => {
@@ -628,16 +629,16 @@ export default function Admin() {
         <div>
           <div className="card">
             <div className="section-title"><h3>Sisa Wallet per Pemain</h3><div className="row"><button className="btn secondary small" onClick={exportWallet}>Export CSV</button></div></div>
-            <p className="muted">Tarif: P 22.500 • R 25.000 • PGK 12.500 • RGK 15.000 — sesuai paket. Bantuan gratis dikecualikan dari refund. Contoh: paket 90rb pakai 2x → sisa 2 → Rp45rb.</p>
+            <p className="muted">Sisa = wallet sekarang (setelah isi list). Masuk = total kredit yg pernah di-top-up (klaim approve + manual cash + koreksi minus), TANPA bantuan gratis. Tarif: P 22.500 • R 25.000 • PGK 12.500 • RGK 15.000. Contoh: top-up 90rb (Masuk P=4) pakai 2x → Sisa P=2 → Rp45rb.</p>
             <input placeholder="Cari nama / WA..." value={walletSearch} onChange={(e)=> setWalletSearch(e.target.value)} style={{ marginBottom: 8 }} />
             <div className="tblwrap"><table>
-              <thead><tr><th>Nama</th><th>P</th><th>R</th><th>PGK</th><th>RGK</th><th>Total</th><th>Bantuan</th><th>Nominal Rp</th><th>Tunggakan</th></tr></thead>
+              <thead><tr><th rowSpan={2}>Nama</th><th colSpan={5}>Sisa (setelah isi list)</th><th rowSpan={2}>Bantuan</th><th rowSpan={2}>Nominal sisa Rp</th><th colSpan={6}>Masuk (total top-up, tanpa bantuan)</th><th rowSpan={2}>Tunggakan</th></tr><tr><th>P</th><th>R</th><th>PGK</th><th>RGK</th><th>Total</th><th>P</th><th>R</th><th>PGK</th><th>RGK</th><th>Total</th><th>Nominal Rp</th></tr></thead>
               <tbody>
                 {walletRows.map((r:any)=> (
-                  <tr key={r.u.id}><td><b>{r.u.nama}</b><br/><small className="muted">{r.u.wa}</small></td><td>{r.w.paket}</td><td>{r.w.reguler}</td><td>{r.w.paket_gk}</td><td>{r.w.reguler_gk}</td><td><b>{r.totalKredit}</b></td><td>{r.bantuanSisa>0 ? <span className="badge yellow">{r.bantuanSisa} R</span> : "-"}</td><td><b>Rp{r.nominal.toLocaleString("id-ID")}</b></td><td>{r.tung>0 ? <span className="badge red">{r.tung.toLocaleString("id-ID")}</span> : r.belumLunas>0 ? <span className="badge blue">{r.belumLunas}x belum</span> : "-"}</td></tr>
+                  <tr key={r.u.id}><td><b>{r.u.nama}</b><br/><small className="muted">{r.u.wa}</small></td><td>{r.w.paket}</td><td>{r.w.reguler}</td><td>{r.w.paket_gk}</td><td>{r.w.reguler_gk}</td><td><b>{r.totalKredit}</b></td><td>{r.bantuanSisa>0 ? <span className="badge yellow">{r.bantuanSisa} R</span> : "-"}</td><td><b>Rp{r.nominal.toLocaleString("id-ID")}</b></td><td>{r.masuk.p}</td><td>{r.masuk.r}</td><td>{r.masuk.pgk}</td><td>{r.masuk.rgk}</td><td><b>{r.masuk.total}</b></td><td><b>Rp{r.masuk.nominal.toLocaleString("id-ID")}</b></td><td>{r.tung>0 ? <span className="badge red">{r.tung.toLocaleString("id-ID")}</span> : r.belumLunas>0 ? <span className="badge blue">{r.belumLunas}x belum</span> : "-"}</td></tr>
                 ))}
               </tbody>
-              <tfoot><tr style={{ background: "#211a08", fontWeight: 700 }}><td><b>TOTAL</b> ({walletRows.length})</td><td colSpan={4}></td><td><b>{walletTotal.kredit}</b></td><td><b>{walletTotal.bantuan} R</b></td><td><b>Rp{walletTotal.nominal.toLocaleString("id-ID")}</b></td><td></td></tr></tfoot>
+              <tfoot><tr style={{ background: "#211a08", fontWeight: 700 }}><td><b>TOTAL</b> ({walletRows.length})</td><td colSpan={4}></td><td><b>{walletTotal.kredit}</b></td><td><b>{walletTotal.bantuan} R</b></td><td><b>Rp{walletTotal.nominal.toLocaleString("id-ID")}</b></td><td colSpan={4}></td><td><b>{walletTotal.masukKredit}</b></td><td><b>Rp{walletTotal.masukNominal.toLocaleString("id-ID")}</b></td><td></td></tr></tfoot>
             </table></div>
             <p className="muted"><small>Total nominal = total dana yang harus dikembalikan jika semua tarik full hari ini. Bantuan dikecualikan. Cek saldo rekening vs total ini untuk aman/tidak.</small></p>
           </div>

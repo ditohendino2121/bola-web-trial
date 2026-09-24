@@ -176,6 +176,26 @@ export function nominalWallet(w: Wallet) {
 export function totalBantuanGranted(db: DB, userId: string) {
   return db.txs.filter(t=> t.userId===userId && t.metode==="bantuan_privat" && t.status==="success").reduce((a,t)=> a + (t.kreditReguler||0)+(t.kreditPaket||0),0);
 }
+/** Total kredit yg pernah masuk (top-up klaim approve + manual cash + koreksi minus), TANPA bantuan gratis */
+export function totalMasuk(db: DB, userId: string): { p: number; r: number; pgk: number; rgk: number; bantuan: number; total: number; nominal: number; } {
+  let p=0, r=0, pgk=0, rgk=0, bantuan=0;
+  db.txs.filter(t=> t.userId===userId && t.status==="success").forEach(t=>{
+    if (t.metode==="bantuan_privat") { bantuan += (t.kreditReguler||0)+(t.kreditPaket||0); return; }
+    if (t.metode==="koreksi_minus") {
+      const m = (t.label||"").match(/kredit\s+(paket_gk|reguler_gk|paket|reguler)/i);
+      const kind = (m?.[1]||"").toLowerCase();
+      if (kind==="paket") p-=1; else if (kind==="reguler") r-=1; else if (kind==="paket_gk") pgk-=1; else if (kind==="reguler_gk") rgk-=1;
+      return;
+    }
+    const kp = t.kreditPaket||0, kr = t.kreditReguler||0;
+    if (!kp && !kr) return;
+    if (t.isGk) { pgk+=kp; rgk+=kr; } else { p+=kp; r+=kr; }
+  });
+  p=Math.max(0,p); r=Math.max(0,r); pgk=Math.max(0,pgk); rgk=Math.max(0,rgk);
+  const total = p+r+pgk+rgk;
+  const nominal = p*TARIF_KREDIT.paket + r*TARIF_KREDIT.reguler + pgk*TARIF_KREDIT.paket_gk + rgk*TARIF_KREDIT.reguler_gk;
+  return { p, r, pgk, rgk, bantuan, total, nominal };
+}
 /** Sisa refundable setelah mengecualikan bantuan (asumsi konservatif: bantuan di R dulu) */
 export function refundableWallet(db: DB, userId: string): { sisa: Wallet; refundable: Wallet; bantuanSisa: number; nominal: number; } {
   const w = walletOf(db, userId);

@@ -5,7 +5,7 @@ import { fetchAll, adminInsert, adminUpdate } from "../../lib/db";
 import { supa } from "../../lib/supabase";
 
 const FIXTURES: [string,string][] = [["A","B"],["C","D"],["A","C"],["B","D"],["A","D"],["B","C"]];
-const POOL_QUOTA: Record<string,number> = { GK:4, Belakang:8, Tengah:8, Depan:8 };
+const POOL_QUOTA: Record<string,number> = { GK:6, Belakang:10, Tengah:12, Depan:12 };
 
 export default function LigaRegistrasi() {
   const [db,setDb]=useState<any>(null);
@@ -13,6 +13,7 @@ export default function LigaRegistrasi() {
   const [busy,setBusy]=useState(false);
   const [posisi,setPosisi]=useState("Depan");
   const [edTanggal,setEdTanggal]=useState(""); const [edLabel,setEdLabel]=useState("");
+  const [manualUser,setManualUser]=useState(""); const [manualPos,setManualPos]=useState(""); const [manualTeam,setManualTeam]=useState("A"); const [kocokBusy,setKocokBusy]=useState(false);
   const reload=()=>fetchAll().then(setDb).catch((e:any)=>setErr(e.message));
   useEffect(()=>{reload();},[]);
   if(err) return <div className="card"><div className="banner err"> {err}</div></div>;
@@ -25,13 +26,13 @@ export default function LigaRegistrasi() {
   const pool:any[] = db.pool||[];
   const teams:any = db.teams||{A:[],B:[],C:[],D:[]};
   const editions:any[] = db.editions||[];
-  const canLock = !locked && pool.length===0 && (["A","B","C","D"] as const).every((t:any)=> (teams[t]||[]).length===7);
+  const canLock = !locked && pool.length===0 && (["A","B","C","D"] as const).every((t:any)=> (teams[t]||[]).length>=10);
 
   // helpers
   const countPool = (pos:string)=>pool.filter((p:any)=>p.posisi===pos).length;
   const sudahDaftar = me ? (pool.some((p:any)=>p.userId===me.id) || ["A","B","C","D"].some(t=> (teams[t]||[]).some((m:any)=>m.userId===me.id))) : false;
   const poolPenuh = POOL_QUOTA.GK===countPool("GK") && POOL_QUOTA.Belakang===countPool("Belakang") && POOL_QUOTA.Tengah===countPool("Tengah") && POOL_QUOTA.Depan===countPool("Depan");
-  const timPenuh = (t:string)=> (teams[t]||[]).length>=7;
+  const timPenuh = (t:string)=> (teams[t]||[]).length>=10;
   const kekurangan = (()=>{
     const need:any={};
     for(const pos of ["GK","Belakang","Tengah","Depan"]){
@@ -54,10 +55,22 @@ export default function LigaRegistrasi() {
     await adminInsert("league_members", { team: null, user_id: me.id, posisi });
   });
 
+  const manualDaftar = ()=>run(async()=>{
+    if(!manualUser || !manualPos || !manualTeam) return alert("Lengkapi semua field");
+    const targetUser=db.users.find((u:any)=>u.id===manualUser);
+    if(!targetUser) return alert("Pemain tidak ditemukan");
+    // Cek apakah pemain sudah terdaftar di tim lain
+    const alreadyInTeam = ["A","B","C","D"].some(t=> (teams[t]||[]).some((m:any)=>m.userId===manualUser));
+    const alreadyInPool = pool.some((p:any)=>p.userId===manualUser);
+    if(alreadyInTeam || alreadyInPool) return alert("Pemain sudah terdaftar (pool/tim lainnya), gunakan Keluarkan dulu");
+    await adminInsert("league_members", { team: manualTeam, user_id: manualUser, posisi: manualPos });
+    setManualUser(""); setManualPos(""); setManualTeam("A");
+  });
+
   const kocok = ()=>run(async()=>{
     if(locked) return alert("Sudah dikunci, tidak bisa kocok ulang");
     // kumpulkan pool per posisi, shuffle, bagi round-robin ber-cap
-    const cap:Record<string,number> = { GK:1, Belakang:2, Tengah:2, Depan:2 };
+    const cap:Record<string,number> = { GK:2, Belakang:3, Tengah:3, Depan:3 };
     // tim saat ini
     const teamMap:Record<string,any[]> = { A:[...teams.A], B:[...teams.B], C:[...teams.C], D:[...teams.D] };
     // untuk setiap posisi, ambil dari pool + yang sudah di tim? Kocok ulang berarti pool + tim diacak ulang total.
@@ -162,7 +175,7 @@ export default function LigaRegistrasi() {
   return (
     <div>
       <h2 style={{ margin:"4px 0" }}>Registrasi KIM x DnA Health League {locked && <span className="badge red">Skuad dikunci</span>}</h2>
-      <p className="muted">Khusus  Member • Pool: GK 4, Belakang 8, Tengah 8, Depan 8 • Maks 6 hari.</p>
+      <p className="muted">Khusus  Member • Pool: GK 6, Belakang 10, Tengah 12, Depan 12 • Maks 6 hari.</p>
       {me && !isMember && <div className="banner warn">Liga khusus member. <b>Beli paket 90rb di Top-Up</b>untuk jadi member.</div>}
 
       {!locked && !sudahDaftar && (
@@ -176,6 +189,37 @@ export default function LigaRegistrasi() {
         </div>
       )}
       {sudahDaftar && <div className="card" style={{ background:"#211a08", borderColor:"var(--gold-deep)" }}><h3>Kamu sudah terdaftar</h3><p>Posisi: {(pool.find((p:any)=>p.userId===me.id)?.posisi) || (Object.values(db.teams).flat() as any[]).find((m:any)=>m.userId===me.id)?.posisi} • Menunggu kocok / lihat Klasemen.</p></div>}
+
+      {isAdmin && !locked && !kocokBusy && (
+        <div className="card" style={{ marginTop:12, borderColor:"var(--gold)" }}>
+          <h3>Input Manual Admin</h3>
+          <p className="muted">Assign pemain ke tim + posisi</p>
+          <div className="grid2">
+            <select style={{ marginBottom:8 }} onChange={(e)=>setManualUser(e.target.value)} >
+              <option value="">-- Pilih Pemain --</option>
+              {db.users.filter((u:any)=>u.status==="approved" && u.is_member).map((u:any)=>(
+                <option key={u.id} value={u.id}>{u.nama} ({u.wa})</option>
+              ))}
+            </select>
+            <select style={{ marginBottom:8 }} onChange={(e)=>setManualPos(e.target.value)} >
+              <option value="">-- Pilih Posisi --</option>
+              <option value="GK">GK</option>
+              <option value="Belakang">Belakang</option>
+              <option value="Tengah">Tengah</option>
+              <option value="Depan">Depan</option>
+            </select>
+            <select style={{ marginBottom:8 }} onChange={(e)=>setManualTeam(e.target.value)} >
+              <option value="">-- Pilih Tim --</option>
+              <option value="A">Tim A</option>
+              <option value="B">Tim B</option>
+              <option value="C">Tim C</option>
+              <option value="D">Tim D</option>
+            </select>
+            <button className="btn" disabled={busy} onClick={manualDaftar}>Assign ke Tim</button>
+          </div>
+          <p className="muted"><small>Total per tim: 10 orang. Posisi terbaru akan menggantikan posisi lama.</small></p>
+        </div>
+      )}
 
       <div className="card">
         <h3>Pool — Belum Terbagi</h3>
@@ -191,7 +235,7 @@ export default function LigaRegistrasi() {
           <div style={{ marginTop:10 }}>
             <button className="btn" disabled={busy } onClick={kocok}>🎲 Kocok Jadi 4 Tim</button>
             <button className="btn secondary" disabled={busy} onClick={kocok} style={{ marginLeft:6 }}>🔁 Kocok Ulang</button>
-            <p className="muted"><small>Dealing ber-cap: GK 1/tim, lain 2/tim — tidak mungkin 2 GK 1 tim. Boleh pool pincang, lapor kekurangan.</small></p>
+            <p className="muted"><small>Dealing ber-cap: GK 2/tim, Belakang 3/tim, Tengah 3/tim, Depan 3/tim — total per tim maks 10. Boleh pool pincang, lapor kekurangan.</small></p>
             {Object.keys(kekurangan).length>0 && <div className="banner warn">Kekurangan: {Object.entries(kekurangan).map(([k,v]:any)=>`${k} −${v}`).join(", ")}</div>}
           </div>
         )}
@@ -201,12 +245,12 @@ export default function LigaRegistrasi() {
       <div className="grid2">
         {(["A","B","C","D"] as const).map(t=>(
           <div key={t} className={`card teamcard ${t}`}>
-            <b>{teamNama(t)}</b> <span className="badge blue">{(teams[t]||[]).length}/7</span>
+            <b>{teamNama(t)}</b> <span className="badge blue">{(teams[t]||[]).length}/10</span>
             {(teams[t]||[]).map((m:any,i:number)=>{
               const u=db.users.find((x:any)=>x.id===m.userId);
               return <p key={i}><span className="badge gray">{m.posisi}</span> {u?.nama||m.userId} {isAdmin && <button className="btn secondary small" disabled={busy} onClick={()=>keluarkan(t,m.userId)}>Keluarkan</button>}</p>;
             })}
-            {isAdmin && (teams[t]||[]).length<7 && (
+            {isAdmin && (teams[t]||[]).length<10 && (
               <div style={{ marginTop:6, display:"flex", gap:6 }}>
                 <select onChange={(e)=>{ const v=e.target.value; if(!v) return; const [uid,pos]=v.split("|"); keluarkan(t,uid); /* pindah? */ }} style={{ flex:1 }}>
                   <option value="">↔ Pindah dari tim lain</option>
@@ -221,7 +265,7 @@ export default function LigaRegistrasi() {
         ))}
       </div>
 
-      {isAdmin && <div className="card"><button className="btn secondary" disabled={busy || (!locked && !canLock)} onClick={toggleLock} title={!locked && !canLock ? "Pool harus kosong & 4 tim penuh 7 orang" : ""}>{locked ? "🔓 Buka Kunci Skuad" : " Kunci Skuad (pool kosong + 4 tim penuh)"}</button> {!locked && !canLock && <small className="muted"> — Pool harus kosong & 4 tim 7 orang dulu.</small>}{locked && <small className="muted">Setelah dikunci hanya ubah manual/k Keluarkan.</small>}</div>}
+      {isAdmin && <div className="card"><button className="btn secondary" disabled={busy || (!locked && !canLock)} onClick={toggleLock} title={!locked && !canLock ? "Pool harus kosong & 4 tim penuh 10 orang" : ""}>{locked ? "🔓 Buka Kunci Skuad" : " Kunci Skuad (pool kosong + 4 tim penuh)"}</button> {!locked && !canLock && <small className="muted"> — Pool harus kosong & 4 tim 10 orang dulu.</small>}{locked && <small className="muted">Setelah dikunci hanya ubah manual/k Keluarkan.</small>}</div>}
 
       <div className="card">
         <h3>🗓 Edisi Liga — Jadwal & Pembayaran (1 edisi = 1 kredit)</h3>

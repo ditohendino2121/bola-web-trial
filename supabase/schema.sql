@@ -143,9 +143,10 @@ values (1, 0, current_date) on conflict (id) do nothing;
 -- ---------- 8. liga ----------
 create table if not exists public.league_meta (
   id int primary key default 1 check (id = 1),
-  locked boolean not null default false
+  locked boolean not null default false,
+  league_format text not null default 'new' check (league_format in ('old','new'))
 );
-insert into public.league_meta (id, locked) values (1, false) on conflict (id) do nothing;
+insert into public.league_meta (id, locked, league_format) values (1, false, 'new') on conflict (id) do nothing;
 
 create table if not exists public.league_members (
   id uuid primary key default gen_random_uuid(),
@@ -287,6 +288,8 @@ begin
   v_kuota := case when v_sch.status = 'sparing' then 14 else coalesce(v_sch.kuota, 28) end;
   select count(*) into v_isi from public.rsvps where schedule_id = p_schedule and status <> 'cancelled';
   if v_isi >= v_kuota then return jsonb_build_object('ok', false, 'msg', 'Kuota penuh'); end if;
+  -- Tidak boleh RSVP setelah H-day (tanggal jadwal)
+  if now()::date >= v_sch.tanggal::date then return jsonb_build_object('ok', false, 'msg', 'Sudah lewat H-day — tidak bisa tarik list'); end if;
 
   v_qpos := case when v_sch.status = 'sparing'
     then (case p_posisi when 'GK' then 2 when 'Belakang' then 4 when 'Tengah' then 4 else 4 end)

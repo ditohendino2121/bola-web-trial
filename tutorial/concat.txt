@@ -1,0 +1,7 @@
+file 'C:\Users\LENOVO\bola-web-trial\tutorial\seg-cover.mp4'
+file 'C:\Users\LENOVO\bola-web-trial\tutorial\seg-daftar.mp4'
+file 'C:\Users\LENOVO\bola-web-trial\tutorial\seg-topup-qris.mp4'
+file 'C:\Users\LENOVO\bola-web-trial\tutorial\seg-topup-transfer.mp4'
+file 'C:\Users\LENOVO\bola-web-trial\tutorial\seg-isilist.mp4'
+file 'C:\Users\LENOVO\bola-web-trial\tutorial\seg-tariklist.mp4'
+file 'C:\Users\LENOVO\bola-web-trial\tutorial\seg-outro.mp4'

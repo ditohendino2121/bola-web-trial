@@ -132,7 +132,7 @@ export const TEAM_DISPLAY: Record<string,string> = {
 export const TEAM_SHORT: Record<string,string> = { A:"PAN", B:"MUB", C:"IBU", D:"DNA" };
 export function teamNama(kode: string) { return TEAM_DISPLAY[kode] || kode; }
 
-export const QUOTA_POSISI: Record<string, number> = { GK: 1, Belakang: 2, Tengah: 2, Depan: 2 };
+export const QUOTA_POSISI: Record<string, number> = { GK: 6, Belakang: 10, Tengah: 12, Depan: 12 };
 export const QUOTA_MAIN: Record<PosisiMain, number> = { GK: 4, Belakang: 8, Tengah: 8, Depan: 8 };
 export const QUOTA_SPARING: Record<PosisiMain, number> = { GK: 2, Belakang: 4, Tengah: 4, Depan: 4 };
 export const POSISI_MAIN: PosisiMain[] = ["GK", "Belakang", "Tengah", "Depan"];

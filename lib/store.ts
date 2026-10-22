@@ -124,12 +124,12 @@ export function topSkor(db: DB) {
 
 export const TEAM_CODES = ["A","B","C","D"] as const;
 export const TEAM_DISPLAY: Record<string,string> = {
-  A: "Panadol Medika FC",
-  B: "Mubacetamol FC",
+  A: "Ampicilin FC",
+  B: "Gentamycin FC",
   C: "Ibuprofen FC",
-  D: "DnA Amoxilin FC",
+  D: "Paracetamol FC",
 };
-export const TEAM_SHORT: Record<string,string> = { A:"PAN", B:"MUB", C:"IBU", D:"DNA" };
+export const TEAM_SHORT: Record<string,string> = { A:"AMC", B:"GEN", C:"IBU", D:"PCM" };
 export function teamNama(kode: string) { return TEAM_DISPLAY[kode] || kode; }
 
 export const QUOTA_POSISI: Record<string, number> = { GK: 6, Belakang: 10, Tengah: 12, Depan: 12 };

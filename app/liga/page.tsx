@@ -234,7 +234,7 @@ export default function LigaPage() {
                   {edMatches.map((m) => (
                     <div key={m.id} className="row" style={{ justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--line-2)" }}>
                       <Link href={`/liga/${m.id}`} style={{ textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", gap: 8 }}>
-                        <Crest team={m.home} size="sm" /> {teamNama(m.home)} <span className={m.sh === null ? "scorebox time" : "scorebox"}>{m.sh === null ? "vs" : `${m.sh}-${m.sa}`}</span> {teamNama(m.away)} <Crest team={m.away} size="sm" />
+                        <Crest team={m.home} size="sm" /> {teamNama(m.home)} <span className={m.sh === null || m.sa === null ? "scorebox time" : "scorebox"}>{m.sh === null || m.sa === null ? "vs" : `${m.sh}-${m.sa}`}</span> {teamNama(m.away)} <Crest team={m.away} size="sm" />
                       </Link>
                       {isAdmin && <button className="btn danger sm" onClick={() => hapusMatch(m.id)}>Hapus</button>}
                     </div>

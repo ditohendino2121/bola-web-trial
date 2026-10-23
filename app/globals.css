@@ -72,6 +72,9 @@ small { font-size: 13px; }
 .grid3 { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .split { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .home-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+/* Item grid defaultnya min-width:auto — dengan isi lebar (tabel) ini bisa memaksa grid melebar
+   ke luar .wrap. Paksa boleh menyusut, biar overflow ditangani .tablewrap di dalamnya. */
+.grid2 > *, .grid3 > *, .split > *, .home-grid > * { min-width: 0; }
 .stack { display: flex; flex-direction: column; gap: 12px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 @media (min-width: 760px) {
@@ -230,6 +233,12 @@ body.nav-open .drawer { transform: translateX(0); }
   background: transparent; border: 1.5px solid var(--line); border-radius: var(--r-2); cursor: pointer; color: var(--ink);
 }
 .iconbtn.on-black { border-color: var(--black-line); color: var(--on-black); }
+.iconbtn[aria-pressed="true"] { border-color: var(--black); background: var(--gold-wash); }
+.card-tag { display: inline-block; width: 11px; height: 15px; border-radius: 2px; vertical-align: -3px; }
+.card-tag.kuning { background: #F2C230; }
+.card-tag.merah { background: var(--bad); }
+.statline { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); justify-content: center; }
+.statline svg { width: 14px; height: 14px; flex-shrink: 0; }
 
 .field { display: block; margin: 10px 0; }
 .field > span { display: block; font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; }
@@ -286,6 +295,7 @@ table.table td.pos { color: var(--ink-3); width: 24px; }
 table.table tr.lead { border-left: 3px solid var(--gold); }
 table.table tr.lead td:first-child { padding-left: 7px; }
 table.table tr.me { background: var(--gold-wash); font-weight: 700; }
+table.table.compact { min-width: 0; }
 table.table.compact td, table.table.compact th { padding: 6px 8px; }
 @media (max-width: 599px) { table.table .hide-sm { display: none; } }
 

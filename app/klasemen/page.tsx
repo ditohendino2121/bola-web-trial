@@ -90,7 +90,7 @@ export default function KlasemenPage() {
                 <div key={m.id}>
                   <Link href={`/liga/${m.id}`} className="fx">
                     <span className="fx-team home">{teamNama(m.home)} <Crest team={m.home} size="sm" /></span>
-                    <span className={m.sh === null ? "scorebox time" : "scorebox"}>{m.sh === null ? "vs" : `${m.sh}-${m.sa}`}</span>
+                    <span className={m.sh === null || m.sa === null ? "scorebox time" : "scorebox"}>{m.sh === null || m.sa === null ? "vs" : `${m.sh}-${m.sa}`}</span>
                     <span className="fx-team away"><Crest team={m.away} size="sm" /> {teamNama(m.away)}</span>
                   </Link>
                   {scorers.length > 0 && <p className="muted" style={{ textAlign: "center", fontSize: 11, margin: "-2px 0 8px" }}>{scorers.map((s) => `${s.nama} - ${s.gol}`).join(" · ")}</p>}

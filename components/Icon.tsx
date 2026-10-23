@@ -1,7 +1,7 @@
 // Ikon garis tebal, ujung persegi (bukan bulat) — ciri khas identitas MUBA FC.
 const P = { width: 22, height: 22, fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "square" as const, strokeLinejoin: "miter" as const };
 
-export type IconName = "home" | "cal" | "wallet" | "clip" | "chart" | "user" | "doc" | "phone" | "shield" | "menu" | "close" | "chevron";
+export type IconName = "home" | "cal" | "wallet" | "clip" | "chart" | "user" | "doc" | "phone" | "shield" | "menu" | "close" | "chevron" | "ball" | "boot";
 
 export default function Icon({ name, ...rest }: { name: IconName } & React.SVGProps<SVGSVGElement>) {
   switch (name) {
@@ -17,6 +17,8 @@ export default function Icon({ name, ...rest }: { name: IconName } & React.SVGPr
     case "menu": return <svg viewBox="0 0 24 24" {...P} {...rest}><path d="M3 6h18M3 12h18M3 18h18" /></svg>;
     case "close": return <svg viewBox="0 0 24 24" {...P} {...rest}><path d="M5 5l14 14M19 5L5 19" /></svg>;
     case "chevron": return <svg viewBox="0 0 24 24" {...P} {...rest}><path d="M9 6l6 6-6 6" /></svg>;
+    case "ball": return <svg viewBox="0 0 24 24" {...P} {...rest}><circle cx="12" cy="12" r="9" /><path d="M12 7.5l3.5 2.5-1.3 4h-4.4l-1.3-4z" /><path d="M12 3v4.5M8.3 14l-3.6 2.6M15.7 14l3.6 2.6" /></svg>;
+    case "boot": return <svg viewBox="0 0 24 24" {...P} {...rest}><path d="M6 3v7l-3.5 4.5V18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1c0-2.5-1.8-3.6-4.7-4.6L14 11V3z" /><path d="M6 9h5" /></svg>;
     default: return <svg viewBox="0 0 24 24" {...P} {...rest}><rect x="4" y="4" width="16" height="16" /></svg>;
   }
 }

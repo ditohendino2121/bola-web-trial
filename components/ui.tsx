@@ -121,6 +121,11 @@ export function FormGuide({ results }: { results: ("W" | "D" | "L")[] }) {
   );
 }
 
+/** Kotak kecil warna kartu (kuning/merah) — bukan ikon garis, karena warnanya sendiri yang jadi penanda. */
+export function CardTag({ kartu }: { kartu: "kuning" | "merah" }) {
+  return <span className={`card-tag ${kartu}`} role="img" aria-label={`Kartu ${kartu}`} />;
+}
+
 export function Initial({ name }: { name: string }) {
   return <span className="initial" aria-hidden="true">{(name || "?").trim().slice(0, 1).toUpperCase()}</span>;
 }

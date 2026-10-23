@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useDB, Loading, LoadError, Crest, Empty } from "../../../components/ui";
+import { useDB, Loading, LoadError, Crest, Empty, CardTag } from "../../../components/ui";
+import Icon from "../../../components/Icon";
 import { supa } from "../../../lib/supa";
 import { teamNama } from "../../../lib/rules";
 import { hitungNilaiOto, finalNilai } from "../_parts/rating";
@@ -108,6 +109,16 @@ export default function LigaDetail() {
   };
   const adaNilaiTersimpan = db.playerStats.some((p) => p.match_id === matchId);
 
+  // Live-score style: pencetak gol/assist/kartu per tim, ditaruh di bawah crest masing-masing.
+  const statLinesFor = (team: string) => {
+    const teamRows = rows.filter((r) => r.team === team);
+    const lines: { key: string; node: React.ReactNode }[] = [];
+    teamRows.forEach((r) => { if (Number(r.gol) > 0) lines.push({ key: `${r.user_id}-gol`, node: <><Icon name="ball" /><span>{r.nama} - {Number(r.gol)}</span></> }); });
+    teamRows.forEach((r) => { if (Number(r.assist) > 0) lines.push({ key: `${r.user_id}-ast`, node: <><Icon name="boot" /><span>{r.nama} - {Number(r.assist)}</span></> }); });
+    teamRows.forEach((r) => { if (r.kartu === "kuning" || r.kartu === "merah") lines.push({ key: `${r.user_id}-kartu`, node: <><CardTag kartu={r.kartu} /><span>{r.nama}</span></> }); });
+    return lines.map((l) => <div key={l.key} className="statline">{l.node}</div>);
+  };
+
   const renderRow = (r: any, idx: number) => {
     const { nilai_oto } = hitungNilaiOto({
       posisi: r.posisi, gol: Number(r.gol) || 0, assist: Number(r.assist) || 0,
@@ -123,7 +134,13 @@ export default function LigaDetail() {
         <td><input style={{ width: 52 }} type="number" min={0} value={r.assist} disabled={!isAdmin} onChange={(e) => updateRow(idx, { assist: e.target.value })} /></td>
         <td><input style={{ width: 52 }} type="number" min={0} value={r.aksi_kunci} disabled={!isAdmin} onChange={(e) => updateRow(idx, { aksi_kunci: e.target.value })} /></td>
         <td><input style={{ width: 52 }} type="number" min={0} value={r.shot_on_target} disabled={!isAdmin} onChange={(e) => updateRow(idx, { shot_on_target: e.target.value })} /></td>
-        <td><select value={r.kartu} disabled={!isAdmin} onChange={(e) => updateRow(idx, { kartu: e.target.value })}><option value="tidak">-</option><option value="kuning">Kuning</option><option value="merah">Merah</option></select></td>
+        <td>
+          <div className="row" style={{ gap: 3, flexWrap: "nowrap" }}>
+            <button type="button" className="iconbtn" style={{ width: 28, height: 28 }} aria-pressed={r.kartu === "tidak"} aria-label="Tanpa kartu" disabled={!isAdmin} onClick={() => updateRow(idx, { kartu: "tidak" })}>-</button>
+            <button type="button" className="iconbtn" style={{ width: 28, height: 28 }} aria-pressed={r.kartu === "kuning"} aria-label="Kartu kuning" disabled={!isAdmin} onClick={() => updateRow(idx, { kartu: "kuning" })}><CardTag kartu="kuning" /></button>
+            <button type="button" className="iconbtn" style={{ width: 28, height: 28 }} aria-pressed={r.kartu === "merah"} aria-label="Kartu merah" disabled={!isAdmin} onClick={() => updateRow(idx, { kartu: "merah" })}><CardTag kartu="merah" /></button>
+          </div>
+        </td>
         <td><input style={{ width: 52 }} type="number" min={0} max={2} value={r.blunder} disabled={!isAdmin} onChange={(e) => updateRow(idx, { blunder: e.target.value })} /></td>
         <td><b>{nilai_oto.toFixed(1)}</b></td>
         <td><b>{final.toFixed(1)}</b></td>
@@ -143,10 +160,16 @@ export default function LigaDetail() {
     <div>
       <p className="wrap" style={{ paddingTop: 16 }}><Link href="/liga" className="linkbtn">Kembali ke Liga</Link></p>
       <div className="wrap" style={{ textAlign: "center", padding: "20px 0" }}>
-        <div className="row" style={{ justifyContent: "center", gap: 24, flexWrap: "wrap" }}>
-          <div><Crest team={match.home} size="lg" /><p style={{ fontWeight: 700, marginTop: 6 }}>{teamNama(match.home)}</p></div>
-          <div className="scorebox" style={{ fontSize: 28, padding: "8px 18px" }}>{match.sh === null ? "vs" : `${match.sh} - ${match.sa}`}</div>
-          <div><Crest team={match.away} size="lg" /><p style={{ fontWeight: 700, marginTop: 6 }}>{teamNama(match.away)}</p></div>
+        <div className="row" style={{ justifyContent: "center", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
+          <div style={{ minWidth: 120 }}>
+            <Crest team={match.home} size="lg" /><p style={{ fontWeight: 700, marginTop: 6 }}>{teamNama(match.home)}</p>
+            <div className="stack" style={{ gap: 2, marginTop: 6 }}>{statLinesFor(match.home)}</div>
+          </div>
+          <div className="scorebox" style={{ fontSize: 28, padding: "8px 18px" }}>{match.sh === null || match.sa === null ? "vs" : `${match.sh} - ${match.sa}`}</div>
+          <div style={{ minWidth: 120 }}>
+            <Crest team={match.away} size="lg" /><p style={{ fontWeight: 700, marginTop: 6 }}>{teamNama(match.away)}</p>
+            <div className="stack" style={{ gap: 2, marginTop: 6 }}>{statLinesFor(match.away)}</div>
+          </div>
         </div>
         <p className="muted" style={{ marginTop: 10 }}><small>{match.tanggal} {match.jam} {match.lokasi}</small></p>
       </div>

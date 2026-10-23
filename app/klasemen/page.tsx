@@ -20,25 +20,33 @@ export default function KlasemenPage(){
   const section = (label:string, ms:any[], hideMatches=false)=>{
     const k = klasemen(ms);
     const psFiltered = playerStats.filter((p:any)=>ms.some((m:any)=>m.id===p.match_id));
-    let top:any[] = [];
-    if(psFiltered.length>0){
-      const map:Record<string,any>={};
-      for(const ps of psFiltered){
-        const u=db.users.find((x:any)=>x.id===ps.user_id);
-        if(!map[ps.user_id]) map[ps.user_id]={ nama:u?.nama||ps.user_id, tim: ps.team, gol:0 };
-        map[ps.user_id].gol+= ps.gol||0;
+    // Roster liga-wide (semua pemain yang sudah diassign ke tim A-D). Dipakai sebagai basis
+    // Top Skor & Player Stats biar SEMUA pemain terdaftar tetap tampil, bukan cuma yang sudah punya catatan.
+    const roster:any[] = (["A","B","C","D"] as const).flatMap((t)=>(db.teams[t]||[]).map((m:any)=>({ userId:m.userId, team:t, posisi:m.posisi })));
+    const matchHasStats = (matchId:string)=> playerStats.some((p:any)=>p.match_id===matchId);
+    const golMap:Record<string,number>={};
+    roster.forEach((r:any)=>{ golMap[r.userId]=0; });
+    ms.forEach((m:any)=>{
+      if(matchHasStats(m.id)){
+        playerStats.filter((p:any)=>p.match_id===m.id).forEach((ps:any)=>{ golMap[ps.user_id]=(golMap[ps.user_id]||0)+(ps.gol||0); });
+      } else {
+        // fallback data lama (format liga lama, sebelum ada tabel league_player_stats)
+        (m.goals||[]).forEach((g:any)=>{ golMap[g.scorerId]=(golMap[g.scorerId]||0)+1; });
       }
-      top=Object.values(map).sort((a:any,b:any)=>b.gol-a.gol);
-    } else {
-      const c:Record<string,number>={};
-      ms.forEach((m:any)=>(m.goals||[]).forEach((g:any)=>{ c[g.scorerId]=(c[g.scorerId]||0)+1; }));
-      top=Object.entries(c).map(([id,gol]:any)=>{
-        const u=db.users.find((x:any)=>x.id===id);
-        const tim=Object.entries(db.teams).find(([,arr]:any)=>arr.some((mm:any)=>mm.userId===id))?.[0]||"-";
-        return { nama:u?.nama||id, tim, gol };
-      }).sort((a:any,b:any)=>b.gol-a.gol);
-    }
+    });
+    const rosterIds=new Set(roster.map((r:any)=>r.userId));
+    const extraIds=Object.keys(golMap).filter((id)=>!rosterIds.has(id)); // scorer lama yang sudah tidak di roster, tetap ditampilkan
+    const timOf=(id:string)=> roster.find((r:any)=>r.userId===id)?.team || Object.entries(db.teams).find(([,arr]:any)=>arr.some((mm:any)=>mm.userId===id))?.[0] || "-";
+    const top=[...roster.map((r:any)=>r.userId), ...extraIds].map((id:string)=>{
+      const u=db.users.find((x:any)=>x.id===id);
+      return { nama:u?.nama||id, tim:timOf(id), gol: golMap[id]||0 };
+    }).sort((a:any,b:any)=>b.gol-a.gol);
+
     const agg:Record<string,any>={};
+    roster.forEach((r:any)=>{
+      const u=db.users.find((x:any)=>x.id===r.userId);
+      agg[r.userId]={ nama:u?.nama||r.userId, team:r.team, posisi:r.posisi, main:0, totalNilai:0, totalGol:0, countNilai:0, terbaik:0 };
+    });
     for(const ps of psFiltered){
       const u=db.users.find((x:any)=>x.id===ps.user_id);
       if(!agg[ps.user_id]) agg[ps.user_id]={ nama:u?.nama||ps.user_id, team:ps.team, posisi:ps.posisi, main:0, totalNilai:0, totalGol:0, countNilai:0, terbaik:0 };
@@ -47,7 +55,7 @@ export default function KlasemenPage(){
       const final = ps.override ?? ps.nilai_oto;
       if(final!==null && final!==undefined){ agg[ps.user_id].totalNilai+=Number(final); agg[ps.user_id].countNilai+=1; agg[ps.user_id].terbaik=Math.max(agg[ps.user_id].terbaik, Number(final)); }
     }
-    const stats=Object.values(agg).map((a:any)=>({ ...a, avg: a.countNilai? Math.round(a.totalNilai/a.countNilai*10)/10 : null })).filter((a:any)=>a.avg!==null).sort((a:any,b:any)=>b.avg-a.avg);
+    const stats=Object.values(agg).map((a:any)=>({ ...a, avg: a.countNilai? Math.round(a.totalNilai/a.countNilai*10)/10 : null })).sort((a:any,b:any)=>(b.avg??-1)-(a.avg??-1));
 
     const scrollStyle: any = { maxHeight: 320, overflowY: "auto", border: "1px solid var(--line)", borderRadius: 10 };
     return (
@@ -56,12 +64,12 @@ export default function KlasemenPage(){
         <h4>📊 Klasemen</h4>
         <div className="tblwrap"><table><thead><tr><th>#</th><th>Tim</th><th>M</th><th>W</th><th>D</th><th>L</th><th>Gol</th><th>+/-</th><th>Poin</th></tr></thead><tbody>{k.map((r:any,i:number)=><tr key={r.tim}><td>{i+1}</td><td><b>{teamNama(r.tim)}</b></td><td>{r.M}</td><td>{r.W}</td><td>{r.D}</td><td>{r.L}</td><td>{r.GM}-{r.GA}</td><td>{r.GD>0?`+${r.GD}`:r.GD}</td><td><b>{r.P}</b></td></tr>)}</tbody></table></div>
         <h4 style={{ marginTop:12 }}>👟 Top Skor</h4>
-        {top.length===0? <p className="muted">Belum ada gol.</p> : (
+        {top.length===0? <p className="muted">Belum ada pemain diassign.</p> : (
           <div style={scrollStyle}><div className="tblwrap" style={{ border: "none", maxHeight: "none" }}><table><thead><tr><th>#</th><th>Pemain</th><th>Tim</th><th>Gol</th></tr></thead><tbody>{top.map((r:any,i:number)=><tr key={r.nama}><td>{i+1}</td><td><b>{r.nama}</b></td><td>{teamNama(r.tim)}</td><td><b>{r.gol}</b></td></tr>)}</tbody></table></div></div>
         )}
         <h4 style={{ marginTop:12 }}>Player Stats (Avg)</h4>
-        {stats.length===0? <p className="muted">Belum ada penilaian.</p> : (
-          <div style={scrollStyle}><div className="tblwrap" style={{ border: "none", maxHeight: "none" }}><table><thead><tr><th>#</th><th>Pemain</th><th>Pos</th><th>Main</th><th>Gol</th><th>Avg</th><th>Terbaik</th></tr></thead><tbody>{stats.map((s:any,i:number)=><tr key={s.nama}><td>{i+1}</td><td><b>{s.nama}</b> <span className="badge gray">{teamNama(s.team)}</span></td><td>{s.posisi}</td><td>{s.main}</td><td>{s.totalGol}</td><td><b>{s.avg.toFixed(1)}</b></td><td>{s.terbaik.toFixed(1)}</td></tr>)}</tbody></table></div></div>
+        {stats.length===0? <p className="muted">Belum ada pemain diassign.</p> : (
+          <div style={scrollStyle}><div className="tblwrap" style={{ border: "none", maxHeight: "none" }}><table><thead><tr><th>#</th><th>Pemain</th><th>Pos</th><th>Main</th><th>Gol</th><th>Avg</th><th>Terbaik</th></tr></thead><tbody>{stats.map((s:any,i:number)=><tr key={s.nama}><td>{i+1}</td><td><b>{s.nama}</b> <span className="badge gray">{teamNama(s.team)}</span></td><td>{s.posisi}</td><td>{s.main}</td><td>{s.totalGol}</td><td>{s.avg!==null?<b>{s.avg.toFixed(1)}</b>:<span className="muted">-</span>}</td><td>{s.main>0?s.terbaik.toFixed(1):<span className="muted">-</span>}</td></tr>)}</tbody></table></div></div>
         )}
         {!hideMatches && (
           <div style={{ marginTop:8 }}>

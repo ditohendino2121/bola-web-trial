@@ -1,10 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { fetchAll, adminInsert, adminUpdate } from "../../lib/db";
 import { supa } from "../../lib/supabase";
 import { teamNama } from "../../lib/store";
-
-const FIXTURES: [string,string][] = [["A","B"],["C","D"],["A","C"],["B","D"],["A","D"],["B","C"]];
 
 export default function LigaRegistrasi() {
   const [db,setDb]=useState<any>(null);
@@ -12,6 +11,7 @@ export default function LigaRegistrasi() {
   const [busy,setBusy]=useState(false);
   const [edTanggal,setEdTanggal]=useState(""); const [edLabel,setEdLabel]=useState("");
   const [manualUser,setManualUser]=useState(""); const [manualPos,setManualPos]=useState(""); const [manualTeam,setManualTeam]=useState("A"); const [kocokBusy,setKocokBusy]=useState(false);
+  const [matchForm,setMatchForm]=useState<Record<string,{home:string;away:string}>>({});
   const reload=()=>fetchAll().then(setDb).catch((e:any)=>setErr(e.message));
   useEffect(()=>{reload();},[]);
   if(err) return <div className="card"><div className="banner err"> {err}</div></div>;
@@ -69,21 +69,27 @@ export default function LigaRegistrasi() {
     return r;
   };
 
-  // ---- BUILD EDISI + JADWAL ----
+  // ---- BUILD EDISI + JADWAL (pertandingan ditambah manual, lihat tambahMatch) ----
   const buatEdisi = ()=>run(async()=>{
     if(!edTanggal) return alert("Pilih tanggal edisi dulu");
-    if(editions.length>=6) return alert("Maks 6 edisi");
     const label=edLabel || `Edisi ${edTanggal}`;
     const { data: ed, error } = await supa().from("league_editions").insert({ label, tanggal: edTanggal }).select().single();
     if(error) throw new Error(error.message);
-    for(const [h,a] of FIXTURES){
-      const { error:e2 } = await supa().from("league_matches").insert({ home:h, away:a, edition_id: ed.id, tanggal: edTanggal }).select().single();
-      if(e2) throw new Error((e2 as any).message);
-    }
     const { error:e3 } = await supa().from("schedules").insert({ tanggal: edTanggal, jam:"20:00-22:00", lokasi:`Liga ${label}`, kuota:28, status:"buka", is_liga:true, edition_id: ed.id });
     if(e3) throw new Error(e3.message);
     setEdTanggal(""); setEdLabel("");
   });
+
+  // ---- TAMBAH / HAPUS PERTANDINGAN (admin pilih tim yang bertanding per edisi) ----
+  const tambahMatch = (edId:string, tanggal:string)=>run(async()=>{
+    const f=matchForm[edId];
+    if(!f?.home || !f?.away) return alert("Pilih tim home dan away");
+    if(f.home===f.away) return alert("Home dan away tidak boleh tim yang sama");
+    const { error } = await supa().from("league_matches").insert({ home:f.home, away:f.away, edition_id: edId, tanggal });
+    if(error) throw new Error(error.message);
+    setMatchForm((p)=>({ ...p, [edId]: { home:"", away:"" } }));
+  });
+  const hapusMatch = (matchId:string)=>{ if(!confirm("Hapus pertandingan ini?")) return; run(async()=>{ const { error } = await supa().from("league_matches").delete().eq("id",matchId); if(error) throw new Error(error.message); }); };
 
   // ---- TOGGLE LOCK ----
   const toggleLock=()=>{ if(!locked && !confirm("Kunci skuad? Setelah dikunci tidak bisa assign manual.")) return; run(()=>adminUpdate("league_meta",1,{ locked: !locked },"id").then(()=>{})); };
@@ -134,14 +140,18 @@ export default function LigaRegistrasi() {
 
       {/* Daftar Tim */}
       <div className="grid2">
-        {(["A","B","C","D"] as const).map(t=>(
+        {(["A","B","C","D"] as const).map(t=>{
+          const list = teams[t]||[];
+          const cnt=(p:string)=>list.filter((m:any)=>m.posisi===p).length;
+          return (
           <div key={t} className={`card teamcard ${t}`}>
-            <b>{teamNama(t)}</b> <span className="badge blue">{(teams[t]||[]).length}/10</span>
-            {(teams[t]||[]).map((m:any,i:number)=>{
+            <b>{teamNama(t)}</b> <span className="badge blue">{list.length}/10</span>
+            <div className="muted" style={{ fontSize:12, margin:"4px 0" }}>GK {cnt("GK")} · Bel {cnt("Belakang")} · Teng {cnt("Tengah")} · Depan {cnt("Depan")}</div>
+            {list.map((m:any,i:number)=>{
               const u=db.users.find((x:any)=>x.id===m.userId);
               return <p key={i}><span className="badge gray">{m.posisi}</span> {u?.nama||m.userId} {isAdmin && <button className="btn secondary small" disabled={busy} onClick={()=>keluarkan(t,m.userId)}>Keluarkan</button>}</p>;
             })}
-            {isAdmin && (teams[t]||[]).length<10 && (
+            {isAdmin && list.length<10 && (
               <div style={{ marginTop:6, display:"flex", gap:6 }}>
                 <select onChange={(e)=>{ const v=e.target.value; if(!v) return; const [uid,pos]=v.split("|"); keluarkan(t,uid); }} style={{ flex:1 }}>
                   <option value="">↔ Pindah dari tim lain</option>
@@ -151,9 +161,10 @@ export default function LigaRegistrasi() {
                 </select>
               </div>
             )}
-            {(teams[t]||[]).length===0 && <p className="muted">Belum ada pemain.</p>}
+            {list.length===0 && <p className="muted">Belum ada pemain.</p>}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Toggle Lock */}
@@ -168,8 +179,7 @@ export default function LigaRegistrasi() {
               <input type="date" value={edTanggal} onChange={(e)=>setEdTanggal(e.target.value)} />
               <input placeholder="Label, cth: Hari 1 — 25 Okt 2026" value={edLabel} onChange={(e)=>setEdLabel(e.target.value)} />
             </div>
-            <button className="btn" disabled={busy||!edTanggal || editions.length>=6} onClick={buatEdisi}>+ Buat Edisi & Jadwal</button>
-            {editions.length>=6 && <p className="muted"><small>Maks 6 edisi tercapai.</small></p>}
+            <button className="btn" disabled={busy||!edTanggal} onClick={buatEdisi}>+ Buat Edisi & Jadwal</button>
           </div>
         )}
         {editions.length===0 && <p className="muted">Belum ada edisi. Admin buat edisi pertama.</p>}
@@ -200,6 +210,29 @@ export default function LigaRegistrasi() {
                       )}
                     </>
                   )}
+                  <div style={{ marginTop:10, paddingTop:10, borderTop:"1px solid var(--line)" }}>
+                    <b>⚽ Pertandingan</b>
+                    {db.matches.filter((m:any)=>m.edition_id===ed.id).length===0 && <p className="muted"><small>Belum ada pertandingan.</small></p>}
+                    {db.matches.filter((m:any)=>m.edition_id===ed.id).map((m:any)=>(
+                      <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 0", borderBottom:"1px solid var(--line)" }}>
+                        <Link href={`/liga/${m.id}`} style={{ textDecoration:"none", color:"inherit" }}><b>{teamNama(m.home)}</b> vs <b>{teamNama(m.away)}</b> <span className={`badge ${m.sh===null?"gray":"green"}`}>{m.sh===null?"belum":`${m.sh}:${m.sa}`}</span></Link>
+                        {isAdmin && <button className="btn danger small" onClick={()=>hapusMatch(m.id)}>Hapus</button>}
+                      </div>
+                    ))}
+                    {isAdmin && (
+                      <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
+                        <select value={matchForm[ed.id]?.home||""} onChange={(e)=>setMatchForm((p)=>({ ...p, [ed.id]: { home:e.target.value, away:p[ed.id]?.away||"" } }))}>
+                          <option value="">Tim Home</option>
+                          {(["A","B","C","D"] as const).map(t=><option key={t} value={t}>{teamNama(t)}</option>)}
+                        </select>
+                        <select value={matchForm[ed.id]?.away||""} onChange={(e)=>setMatchForm((p)=>({ ...p, [ed.id]: { home:p[ed.id]?.home||"", away:e.target.value } }))}>
+                          <option value="">Tim Away</option>
+                          {(["A","B","C","D"] as const).map(t=><option key={t} value={t}>{teamNama(t)}</option>)}
+                        </select>
+                        <button className="btn secondary small" disabled={busy} onClick={()=>tambahMatch(ed.id, ed.tanggal)}>+ Tambah</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -211,24 +244,23 @@ export default function LigaRegistrasi() {
       {me && !isAdmin && (
         <div className="card" style={{ marginTop:12, borderColor:"var(--gold)" }}>
           <h3>Tarik List (Batal Konfirmasi)</h3>
-          <p className="muted">Batal konfirmasi sebelum H-day untuk kembalikan kredit</p>
+          <p className="muted">Batal konfirmasi s.d. H-1 (sehari sebelum jadwal) untuk kembalikan kredit</p>
           {editions.length>0 && editions.map((ed:any)=>{
             const s=db.schedules.find((x:any)=>x.is_liga && x.edition_id===ed.id);
             if(!s) return null;
             const myRsvp=s? db.rsvps.find((r:any)=>r.scheduleId===s.id && r.userId===me?.id && r.status!=="cancelled") : null;
             if(!myRsvp) return null;
-            const batasBatal = new Date(s.tanggal);
-            batasBatal.setDate(batasBatal.getDate() - 2);
-            const sudahLewatHariH = new Date() >= batasBatal;
+            const todayISO = new Date().toISOString().slice(0,10);
+            const sudahHariH = todayISO >= s.tanggal;
             return (
               <div key={ed.id} style={{ marginTop:8, padding:8, background:"#1e1e22", borderRadius:8 }}>
                 <b>Edisi:</b> {ed.label} {ed.tanggal} <br/>
                 <b>Posisi:</b> {myRsvp.posisi} <br/>
                 <b>Status:</b> {myRsvp.status} <br/>
                 <b>Metode:</b> {myRsvp.metode} <br/>
-                {sudahLewatHariH ? <p className="banner warn">Sudah lewat H-2 — tetap wajib bayar, tidak bisa batal.</p> : (
+                {sudahHariH ? <p className="banner warn">Sudah hari-H — tetap wajib bayar, tidak bisa batal.</p> : (
                   <button className="btn danger small" onClick={async()=>{ try{ await batalRsvp(myRsvp.id); location.reload(); }catch(e:any){ alert(e.message); } }}>
-                    Batal (Kembalikan Kredit)
+                    Batal — Boleh s.d. H-1 (Kembalikan Kredit)
                   </button>
                 )}
               </div>

@@ -38,9 +38,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   }, [path]);
 
   useEffect(() => {
-    const sb = supa();
-    const { data: sub } = sb.auth.onAuthStateChange(() => setOpen(false));
-    return () => sub.subscription.unsubscribe();
+    try {
+      const sb = supa();
+      const { data: sub } = sb.auth.onAuthStateChange(() => setOpen(false));
+      return () => sub.subscription.unsubscribe();
+    } catch { /* env belum diisi / offline — jangan sampai nge-crash seluruh halaman */ }
   }, []);
 
   useEffect(() => { setOpen(false); }, [path]);

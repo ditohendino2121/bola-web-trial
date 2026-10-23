@@ -90,7 +90,7 @@ export default function KlasemenPage(){
         <div className="grid2">
           {(["A","B","C","D"] as const).map(t=>(
             <div key={t} className={`card teamcard ${t}`} style={{ margin:0 }}>
-              <b>{teamNama(t)}</b> <span className="badge blue">{(db.teams[t]||[]).length}/7</span>
+              <b>{teamNama(t)}</b> <span className="badge blue">{(db.teams[t]||[]).length}/10</span>
               {(db.teams[t]||[]).map((m:any,i:number)=>{
                 const u=db.users.find((x:any)=>x.id===m.userId);
                 return <p key={i}><span className="badge gray">{m.posisi}</span> {u?.nama||m.userId}</p>;

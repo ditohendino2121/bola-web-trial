@@ -1,24 +1,65 @@
-// Data layer Supabase — menggantikan localStorage.
-// Semua fungsi async. Bentuk DB sama seperti lib/store agar halaman minim berubah.
-import { supa } from "./supabase";
-import type { DB } from "./store";
+// Lapisan data Supabase. Tidak ada perubahan tabel/kolom/RPC dari versi lama — lihat
+// redesign.md bagian 6 untuk kontrak lengkap (baca, auth, RPC, tulis per halaman).
+import { supa } from "./supa";
 
-export { supa };
+export type Role = "admin" | "player";
+export type Status = "pending" | "approved" | "rejected";
+export type RsvpStatus = "confirmed_lunas" | "confirmed_utang" | "confirmed_langsung" | "wajib_bayar" | "cancelled" | "no_show";
+export type RsvpMetode = "deposit" | "utang" | "langsung";
+export type PosisiMain = "GK" | "Belakang" | "Tengah" | "Depan";
+export type ScheduleStatus = "buka" | "tutup" | "full_booked" | "sparing";
+export type TxStatus = "pending" | "success" | "rejected";
 
-const mapUser = (p: any) => ({
+export interface User { id: string; nama: string; wa: string; email: string; role: Role; status: Status; is_member: boolean; setuju_akad?: boolean; setuju_at?: string; akad_version?: string; }
+export interface Schedule { id: string; tanggal: string; jam: string; lokasi: string; kuota: number; status: ScheduleStatus; is_liga?: boolean; edition_id?: string | null; liga_match_id?: string | null; }
+export interface Rsvp { id: string; scheduleId: string; userId: string; status: RsvpStatus; posisi: PosisiMain; metode: RsvpMetode; pakaiGk?: boolean; is_alihan?: boolean; alih_dari?: string; }
+export interface Tx {
+  id: string; userId: string; label: string;
+  kreditPaket: number; kreditReguler: number; rupiah: number;
+  metode: string; tanggal: string; status: TxStatus;
+  paket?: "1x" | "4x"; bukti?: string; catatan?: string; privateNote?: string; isGk?: boolean;
+}
+export interface Wallet { paket: number; reguler: number; paket_gk: number; reguler_gk: number; }
+export interface Goal { scorerId: string; }
+export interface Match { id: string; home: string; away: string; sh: number | null; sa: number | null; goals: Goal[]; tanggal?: string; jam?: string; lokasi?: string; edition_id?: string | null; }
+export interface TeamMember { userId: string; posisi: PosisiMain; }
+export interface LeagueEdition { id: string; label: string; tanggal: string; created_at: string; }
+export interface PlayerStat { id: string; match_id: string; user_id: string; team: string; posisi: string; gol: number; assist: number; aksi_kunci: number; shot_on_target: number; kartu: string; blunder: number; nilai_oto: number | null; override: number | null; catatan_override?: string; }
+export interface Expense { id: string; tanggal: string; jenis: string; keterangan: string; nominal: number; }
+export interface ManualIncome { id: string; tanggal: string; sumber: string; keterangan: string; nominal: number; }
+
+export interface DB {
+  users: User[];
+  schedules: Schedule[];
+  rsvps: Rsvp[];
+  txs: Tx[];
+  wallets: Record<string, Wallet>;
+  teams: Record<string, TeamMember[]>;
+  pool: TeamMember[]; // belum diassign ke tim (team null)
+  matches: Match[];
+  leagueLocked: boolean;
+  editions: LeagueEdition[];
+  playerStats: PlayerStat[];
+  expenses: Expense[];
+  incomes: ManualIncome[];
+  settings: { kasAwal: number; kasAwalTanggal: string };
+  sessionId: string | null;
+}
+
+const mapUser = (p: any): User => ({
   id: p.id, nama: p.nama, wa: p.wa, email: p.email,
   role: p.role, status: p.status, is_member: !!p.is_member,
   setuju_akad: !!p.setuju_akad, setuju_at: p.setuju_at, akad_version: p.akad_version,
 });
-const mapSchedule = (s: any) => ({
+const mapSchedule = (s: any): Schedule => ({
   id: s.id, tanggal: s.tanggal, jam: s.jam, lokasi: s.lokasi, kuota: s.kuota, status: s.status,
   is_liga: !!s.is_liga, edition_id: s.edition_id || null, liga_match_id: s.liga_match_id || null,
 });
-const mapRsvp = (r: any) => ({
+const mapRsvp = (r: any): Rsvp => ({
   id: r.id, scheduleId: r.schedule_id, userId: r.user_id,
   status: r.status, posisi: r.posisi, metode: r.metode, pakaiGk: !!r.pakai_gk, is_alihan: !!r.is_alihan, alih_dari: r.alih_dari,
 });
-const mapTx = (t: any) => ({
+const mapTx = (t: any): Tx => ({
   id: t.id, userId: t.user_id, label: t.label,
   kreditPaket: t.kredit_paket, kreditReguler: t.kredit_reguler, rupiah: t.rupiah,
   metode: t.metode, tanggal: t.tanggal, status: t.status,
@@ -30,7 +71,7 @@ export async function sessionId(): Promise<string | null> {
   return data.session?.user?.id || null;
 }
 
-export async function fetchAll(): Promise<DB> {
+export async function loadAll(): Promise<DB> {
   const sb = supa();
   const sid = await sessionId();
   const [users, schedules, rsvps, txs, wallets, members, matches, meta, expenses, incomes, settings, editions, playerStats] =
@@ -137,7 +178,6 @@ export async function batalRsvp(scheduleId: string) {
   if (!r?.ok) throw new Error(r?.msg || "Gagal batal");
 }
 
-// ---------- klaim top-up ----------
 export async function alihSlot(rsvpId: string, penggantiId: string) {
   const { data, error } = await supa().rpc("rpc_alih_slot", { p_rsvp_id: rsvpId, p_pengganti: penggantiId });
   if (error) throw new Error(error.message);
@@ -145,7 +185,8 @@ export async function alihSlot(rsvpId: string, penggantiId: string) {
   if (!r?.ok) throw new Error(r?.msg || "Gagal alih slot");
 }
 
-export async function kirimKlaim(userId: string, paket: "1x" | "4x", metode: string, rupiah: number, bukti: string, catatan: string, isGK = false) {
+// ---------- klaim top-up ----------
+export async function klaimTopup(userId: string, paket: "1x" | "4x", metode: string, rupiah: number, bukti: string, catatan: string, isGK = false) {
   const { error } = await supa().from("txs").insert({
     user_id: userId,
     label: `Klaim top-up ${paket}${isGK ? " (harga GK)" : ""} via ${metode} (Rp${rupiah.toLocaleString("id-ID")})`,
@@ -154,17 +195,17 @@ export async function kirimKlaim(userId: string, paket: "1x" | "4x", metode: str
   if (error) throw new Error(error.message);
 }
 
-// ---------- admin helpers (RLS is_admin) ----------
-export async function adminUpdate(table: string, id: string | number, patch: any, idCol = "id") {
+// ---------- CRUD generik admin (RLS is_admin memvalidasi di server) ----------
+export async function updateRow(table: string, id: string | number, patch: any, idCol = "id") {
   const { error } = await supa().from(table).update(patch).eq(idCol, id);
   if (error) throw new Error(error.message);
 }
-export async function adminInsert(table: string, row: any) {
+export async function insertRow(table: string, row: any) {
   const { data, error } = await supa().from(table).insert(row).select().limit(1);
   if (error) throw new Error(error.message);
   return (data || [])[0];
 }
-export async function adminDelete(table: string, id: string | number, idCol = "id") {
+export async function deleteRow(table: string, id: string | number, idCol = "id") {
   const { error } = await supa().from(table).delete().eq(idCol, id);
   if (error) throw new Error(error.message);
 }

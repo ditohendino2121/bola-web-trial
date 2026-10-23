@@ -1,5 +1,5 @@
 // Ikon garis tebal, ujung persegi (bukan bulat) — ciri khas identitas MUBA FC.
-const P = { fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "square" as const, strokeLinejoin: "miter" as const };
+const P = { width: 22, height: 22, fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "square" as const, strokeLinejoin: "miter" as const };
 
 export type IconName = "home" | "cal" | "wallet" | "clip" | "chart" | "user" | "doc" | "phone" | "shield" | "menu" | "close" | "chevron";
 

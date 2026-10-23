@@ -60,12 +60,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             <div><b>MUBA FC</b><small>Masjid Utsman Bin Affan</small></div>
           </Link>
           <nav className="mast-nav" aria-label="Navigasi utama">
-            {MENU.map((m) => (
+            {MENU.filter((m) => m.href !== "/dashboard").map((m) => (
               <Link key={m.href} href={m.href} aria-current={isActive(path, m.href) ? "page" : undefined}>{m.label}</Link>
             ))}
           </nav>
           {loggedIn ? (
-            <Link href="/dashboard" className="mast-chip">{kredit} kredit</Link>
+            <Link href="/dashboard" className="mast-chip" aria-current={isActive(path, "/dashboard") ? "page" : undefined}><Icon name="user" width={16} height={16} /> {nama.split(" ")[0] || "Saya"}</Link>
           ) : (
             <Link href="/#akun" className="mast-chip ghost">Masuk</Link>
           )}

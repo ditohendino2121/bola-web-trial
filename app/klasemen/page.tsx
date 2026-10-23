@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Tabs, Crest, FormGuide } from "../../components/ui";
-import { klasemen, teamNama, formGuide, TEAM_CODES } from "../../lib/rules";
+import { klasemen, teamNama, formGuide, TEAM_CODES, urutkanPosisi } from "../../lib/rules";
 import { finalNilai } from "../liga/_parts/rating";
 
 export default function KlasemenPage() {
@@ -159,7 +159,7 @@ export default function KlasemenPage() {
               <div key={t} style={{ borderLeft: `3px solid var(--team-${t.toLowerCase()})`, paddingLeft: 12 }}>
                 <div className="clubcell" style={{ marginBottom: 6 }}><Crest team={t} /> <b>{teamNama(t)}</b> <span className="pill neutral">{(db.teams[t] || []).length}/10</span></div>
                 <div className="people">
-                  {(db.teams[t] || []).map((m, i) => {
+                  {urutkanPosisi(db.teams[t] || []).map((m, i) => {
                     const u = db.users.find((x) => x.id === m.userId);
                     return <div key={i} className="person"><span className="pill neutral">{m.posisi}</span> {u?.nama || m.userId}</div>;
                   })}

@@ -104,6 +104,12 @@ export const QUOTA_POSISI: Record<string, number> = { GK: 6, Belakang: 10, Tenga
 export const QUOTA_MAIN: Record<PosisiMain, number> = { GK: 4, Belakang: 8, Tengah: 8, Depan: 8 };
 export const QUOTA_SPARING: Record<PosisiMain, number> = { GK: 2, Belakang: 4, Tengah: 4, Depan: 4 };
 export const POSISI_MAIN: PosisiMain[] = ["GK", "Belakang", "Tengah", "Depan"];
+const POSISI_ORDER: Record<string, number> = { GK: 0, Belakang: 1, Tengah: 2, Depan: 3 };
+/** Urutkan daftar pemain GK -> Belakang -> Tengah -> Depan. Dipakai untuk daftar roster/penilaian,
+    BUKAN untuk Top Skor atau Player Stats (itu tetap urut gol/avg). */
+export function urutkanPosisi<T extends { posisi: string }>(list: T[]): T[] {
+  return [...list].sort((a, b) => (POSISI_ORDER[a.posisi] ?? 99) - (POSISI_ORDER[b.posisi] ?? 99));
+}
 
 export function isSparing(s: Schedule) { return s.status === "sparing"; }
 export function kuotaAktif(s: Schedule) { return isSparing(s) ? 14 : s.kuota || 28; }

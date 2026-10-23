@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useDB, Loading, LoadError, Crest, Empty, CardTag } from "../../../components/ui";
 import Icon from "../../../components/Icon";
 import { supa } from "../../../lib/supa";
-import { teamNama } from "../../../lib/rules";
+import { teamNama, urutkanPosisi } from "../../../lib/rules";
 import { hitungNilaiOto, finalNilai } from "../_parts/rating";
 
 export default function LigaDetail() {
@@ -20,8 +20,8 @@ export default function LigaDetail() {
     if (!db) return;
     const m = db.matches.find((x) => x.id === matchId);
     if (m) { setSh(m.sh !== null ? String(m.sh) : ""); setSa(m.sa !== null ? String(m.sa) : ""); }
-    const homeMembers = db.teams[m?.home || ""] || [];
-    const awayMembers = db.teams[m?.away || ""] || [];
+    const homeMembers = urutkanPosisi(db.teams[m?.home || ""] || []);
+    const awayMembers = urutkanPosisi(db.teams[m?.away || ""] || []);
     const all = [...homeMembers.map((x) => ({ ...x, team: m?.home })), ...awayMembers.map((x) => ({ ...x, team: m?.away }))];
     const existing = db.playerStats.filter((p) => p.match_id === matchId);
     setRows(all.map((mem) => {

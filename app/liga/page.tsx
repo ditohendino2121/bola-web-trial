@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Crest, Empty } from "../../components/ui";
 import { supa } from "../../lib/supa";
 import { updateRow } from "../../lib/data";
-import { teamNama, walletOf, TEAM_CODES, lewatHariHLiga } from "../../lib/rules";
+import { teamNama, walletOf, TEAM_CODES, lewatHariHLiga, urutkanPosisi } from "../../lib/rules";
 
 const POSISI = ["GK", "Belakang", "Tengah", "Depan"] as const;
 
@@ -153,7 +153,7 @@ export default function LigaPage() {
 
         <div className="grid2">
           {TEAM_CODES.map((t) => {
-            const list = teams[t] || [];
+            const list = urutkanPosisi(teams[t] || []);
             const cnt = (p: string) => list.filter((m) => m.posisi === p).length;
             return (
               <div key={t} className="panel" style={{ borderLeft: `3px solid var(--team-${t.toLowerCase()})` }}>
@@ -174,7 +174,7 @@ export default function LigaPage() {
                 {isAdmin && list.length < 10 && (
                   <select style={{ marginTop: 8 }} onChange={(e) => { const v = e.target.value; if (!v) return; const [uid, fromTeam, posisi] = v.split("|"); pindahPemain(fromTeam, t, uid, posisi); e.target.value = ""; }}>
                     <option value="">Pindahkan dari tim lain...</option>
-                    {TEAM_CODES.filter((x) => x !== t).flatMap((x) => (teams[x] || []).map((m) => ({ ...m, from: x }))).map((m) => (
+                    {urutkanPosisi(TEAM_CODES.filter((x) => x !== t).flatMap((x) => (teams[x] || []).map((m) => ({ ...m, from: x })))).map((m) => (
                       <option key={m.userId} value={`${m.userId}|${m.from}|${m.posisi}`}>{db.users.find((u) => u.id === m.userId)?.nama} — {m.posisi} (dari {teamNama(m.from)})</option>
                     ))}
                   </select>

@@ -63,16 +63,6 @@ export default function KlasemenPage() {
 
   const tabItems = [{ key: "overall", label: "Overall" }, ...editions.map((e) => ({ key: e.id, label: e.label }))];
 
-  // Pencetak gol per laga (live-score style di bawah skor). Fallback ke m.goals untuk laga format lama.
-  const scorersFor = (m: (typeof matches)[number]) => {
-    const fromStats = playerStats.filter((p) => p.match_id === m.id && (p.gol || 0) > 0);
-    const list = fromStats.length > 0
-      ? fromStats.map((p) => ({ nama: db.users.find((u) => u.id === p.user_id)?.nama || p.user_id, gol: p.gol }))
-      : Object.entries((m.goals || []).reduce((acc: Record<string, number>, g) => { acc[g.scorerId] = (acc[g.scorerId] || 0) + 1; return acc; }, {}))
-        .map(([id, gol]) => ({ nama: db.users.find((u) => u.id === id)?.nama || id, gol }));
-    return list.sort((a, b) => b.gol - a.gol);
-  };
-
   return (
     <div>
       <PageHead
@@ -84,19 +74,13 @@ export default function KlasemenPage() {
         {edLabel && (
           <div className="panel">
             <h3>Pertandingan - {edLabel.label}</h3>
-            {ms.length === 0 ? <p className="muted">Belum ada laga di edisi ini.</p> : ms.map((m) => {
-              const scorers = scorersFor(m);
-              return (
-                <div key={m.id}>
-                  <Link href={`/liga/${m.id}`} className="fx">
-                    <span className="fx-team home">{teamNama(m.home)} <Crest team={m.home} size="sm" /></span>
-                    <span className={m.sh === null || m.sa === null ? "scorebox time" : "scorebox"}>{m.sh === null || m.sa === null ? "vs" : `${m.sh}-${m.sa}`}</span>
-                    <span className="fx-team away"><Crest team={m.away} size="sm" /> {teamNama(m.away)}</span>
-                  </Link>
-                  {scorers.length > 0 && <p className="muted" style={{ textAlign: "center", fontSize: 11, margin: "-2px 0 8px" }}>{scorers.map((s) => `${s.nama} - ${s.gol}`).join(" · ")}</p>}
-                </div>
-              );
-            })}
+            {ms.length === 0 ? <p className="muted">Belum ada laga di edisi ini.</p> : ms.map((m) => (
+              <Link key={m.id} href={`/liga/${m.id}`} className="fx">
+                <span className="fx-team home">{teamNama(m.home)} <Crest team={m.home} size="sm" /></span>
+                <span className={m.sh === null || m.sa === null ? "scorebox time" : "scorebox"}>{m.sh === null || m.sa === null ? "vs" : `${m.sh}-${m.sa}`}</span>
+                <span className="fx-team away"><Crest team={m.away} size="sm" /> {teamNama(m.away)}</span>
+              </Link>
+            ))}
           </div>
         )}
 

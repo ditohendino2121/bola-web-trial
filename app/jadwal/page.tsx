@@ -1,56 +1,49 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useDB, PageHead, Loading, LoadError, StatusPill, Meter, DateBox, Empty } from "../../components/ui";
 import {
-  dikunciRSVP, langsungBelumLunas, QUOTA_MAIN, POSISI_MAIN, kuotaAktif, quotaPosisi,
-  lewatH2, fmtBatas, STATUS_LABEL,
-  type PosisiMain, type RsvpMetode,
-} from "../../lib/store";
-import { fetchAll, rsvp, batalRsvp } from "../../lib/db";
+  dikunciRSVP, langsungBelumLunas, POSISI_MAIN, kuotaAktif, quotaPosisi,
+  lewatH2, fmtBatas,
+} from "../../lib/rules";
+import { rsvp, batalRsvp, type PosisiMain } from "../../lib/data";
 
-function todayLocalISO() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
-function labelTanggal(iso:string){ const d=new Date(iso+"T00:00:00"); const days=["Min","Sen","Sel","Rab","Kam","Jum","Sab"]; return {label:days[d.getDay()], num:String(d.getDate()).padStart(2,"0")}; }
+function todayLocalISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+const DAYS = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
 export default function Jadwal() {
-  const [db, setDb] = useState<any>(null);
-  const [err, setErr] = useState("");
+  const { db, error, reload } = useDB();
   const [busy, setBusy] = useState(false);
   const [posisiPilih, setPosisiPilih] = useState<Record<string, PosisiMain>>({});
   const [selected, setSelected] = useState<string | null>(null);
-  const reload = () =>fetchAll().then(setDb).catch((e: any) =>setErr(e.message));
-  useEffect(() => { reload(); }, []);
 
-  // hooks harus di atas sebelum early return — data turunan di-guard jika db null
   const todayISO = todayLocalISO();
-  const jadwalBiasa: any[] = db ? db.schedules.filter((s:any)=>!s.is_liga).sort((a: any, b: any) =>a.tanggal.localeCompare(b.tanggal)) : [];
-  const upcoming: any[] = jadwalBiasa.filter((s:any)=> s.tanggal >= todayISO);
-  const upcomingDates: string[] = (Array.from(new Set(upcoming.map((s:any)=> s.tanggal as string))) as string[]).sort();
-  const accentFor = (idx:number)=> ["accent-gold","accent-lilac","accent-teal","accent-pink","accent-blue"][idx%5];
+  const jadwalBiasa = db ? db.schedules.filter((s) => !s.is_liga).sort((a, b) => a.tanggal.localeCompare(b.tanggal)) : [];
+  const upcoming = jadwalBiasa.filter((s) => s.tanggal >= todayISO);
+  const upcomingDates = Array.from(new Set(upcoming.map((s) => s.tanggal))).sort();
   const datesKey = upcomingDates.join(",");
-  useEffect(()=>{
-    if(!db) return;
+  useEffect(() => {
+    if (!db) return;
     const q = new URLSearchParams(window.location.search).get("tgl");
-    if(q && (upcomingDates as string[]).includes(q)) setSelected(q as string);
-    else if(upcomingDates.length>0 && !selected) setSelected(upcomingDates[0] as string);
+    if (q && upcomingDates.includes(q)) setSelected(q);
+    else if (upcomingDates.length > 0 && !selected) setSelected(upcomingDates[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, datesKey]);
-  const visible = selected ? upcoming.filter((s:any)=> s.tanggal===selected) : upcoming;
+  const visible = selected ? upcoming.filter((s) => s.tanggal === selected) : upcoming;
 
-  const me = db ? db.users.find((u: any) =>u.id === db.sessionId) : null;
-  if (err) return <div className="card"><div className="banner err"> {err}</div></div>;
-  if (!db) return <div className="card"><p>Memuat...</p></div>;
-  if (!me) return <div className="card"><h3>Login dulu yuk </h3><p className="muted">Daftar / login di Beranda, gratis.</p></div>;
-  if (me.status !== "approved") return <div className="card"><div className="banner warn">Akun <b>{me.nama}</b>masih <b>{me.status}</b>. Minta admin approve dulu ya.</div></div>;
+  if (error) return <div className="page wrap"><LoadError message={error} onRetry={reload} /></div>;
+  if (!db) return <div className="page wrap"><Loading what="jadwal" /></div>;
+  const me = db.users.find((u) => u.id === db.sessionId);
+  if (!me) return <div className="page wrap"><Empty title="Login dulu untuk isi list" action={<a href="/#akun"><button className="btn" style={{ marginTop: 10 }}>Ke beranda</button></a>} /></div>;
+  if (me.status !== "approved") return <div className="page wrap"><div className="note warn">Akun {me.nama} masih {me.status}. Minta admin approve dulu.</div></div>;
 
-  const ikut = async (s: any, metode: RsvpMetode) => {
-    setBusy(true); setErr("");
-    try {
-      await rsvp(s.id, posisiPilih[s.id] || "Depan", metode);
-      await reload();
-    } catch (e: any) { alert(e.message); }
+  const ikut = async (s: any, metode: "deposit" | "langsung") => {
+    setBusy(true);
+    try { await rsvp(s.id, posisiPilih[s.id] || "Depan", metode); await reload(); }
+    catch (e: any) { alert(e.message); }
     setBusy(false);
   };
-
   const batal = async (s: any) => {
-    if (lewatH2(s)) return alert(`Sudah lewat batas H-2 (${fmtBatas(s)}). Tidak bisa tarik list — tetap wajib bayar. Hubungi admin jika darurat.`);
+    if (lewatH2(s)) return alert(`Sudah lewat batas H-2 (${fmtBatas(s)}). Tidak bisa tarik list, tetap wajib bayar. Hubungi admin jika darurat.`);
     if (!confirm("Tarik list? Kredit/utangmu untuk jadwal ini dibatalkan.")) return;
     setBusy(true);
     try { await batalRsvp(s.id); await reload(); }
@@ -63,87 +56,102 @@ export default function Jadwal() {
 
   return (
     <div>
-      <div className="page-head" style={{ marginBottom: 6 }}><h2 style={{ margin: "4px 0" }}>Mau ikut yang mana?</h2><p>Jadwal FUN upcoming — tap tanggal untuk filter list</p></div>
-      {upcomingDates.length>0 ? (
-        <div className="date-strip">
-          {upcomingDates.map((iso: string)=> { const {label,num}=labelTanggal(iso); const on=iso===selected; return (<button key={iso} className={`date-pill ${on ? "on" : ""} has`} onClick={()=> setSelected(iso as string)}>{label}<b>{num}</b></button>); })}
-        </div>
-      ) : null}
-      <p className="muted" style={{ fontSize: 12, margin: "2px 0 8px" }}>Kuota 28: GK 4 · Belakang/Tengah/Depan @8. Untuk jadwal liga, buka panel Liga.</p>
-      {terkunci && <div className="banner err"> {nLangsung > 0 ? `Kamu ada ${nLangsung}x bayar-di-tempat yang belum dikonfirmasi lunas admin. Selesaikan dulu untuk buka list berikutnya.` : "Kamu punya tunggakan. Lunasi ke admin dulu untuk buka list berikutnya."}</div>}
-      {jadwalBiasa.length===0 && <div className="card"><p className="muted">Belum ada jadwal FUN. Admin buat di Kelola Jadwal.</p></div>}
-      {upcoming.length===0 && jadwalBiasa.length>0 && <div className="card"><p className="muted">Semua jadwal sudah lewat. Menunggu jadwal baru dari admin.</p></div>}
-      {selected && upcomingDates.length>1 && <p className="muted" style={{ fontSize:12, margin:"6px 0 2px" }}>Menampilkan tanggal <b style={{ color:"#fff" }}>{selected}</b> — {visible.length} jadwal • <a onClick={()=> setSelected(null)} style={{ color:"var(--gold)", cursor:"pointer", textDecoration:"underline" }}>tampilkan semua upcoming</a></p>}
-      {visible.map((s: any, idx:number) => {
-      const list = db.rsvps.filter((r: any) =>r.scheduleId === s.id && r.status !== "cancelled");
-      const mine = list.find((r: any) =>r.userId === me.id);
-      const ka = kuotaAktif(s);
-      const pct = Math.min(100, Math.round((list.length / ka) * 100));
-      const penuh = list.length >= ka;
-      const ditutup = s.status === "tutup" || s.status === "full_booked";
-      const pos = posisiPilih[s.id] || "Depan";
-      const h2 = lewatH2(s);
-      return (
-      <div className={`match-card ${accentFor(idx)}`} key={s.id} id={`jad-${s.tanggal}`}>
-            <div className="ticket">
-              <div className="datebox">{s.tanggal.slice(8, 10)}<span>{s.tanggal.slice(5, 7)}/{s.tanggal.slice(0, 4)}</span></div>
-              <div style={{ flex: 1 }}>
-                <b style={{ fontSize: 17 }}>{s.jam}</b> <span className={`badge ${s.status === "buka" ? "green" : s.status === "sparing" ? "blue" : "red"}`}>{STATUS_LABEL[s.status]}</span><br />
-                <small className="muted"> {s.lokasi}</small>
-                <div className="progress"><i style={{ width: pct + "%", background: penuh || ditutup ? "#DC2626" : undefined }} /></div>
-                <small className="muted">{list.length}/{ka} sudah isi list {penuh ? "• PENUH" : `• sisa ${ka - list.length}`} • batas tarik: {fmtBatas(s)}</small>{" "}
-                {mine && <span className={`badge ${mine.status === "confirmed_lunas" ? "green" : mine.status === "confirmed_langsung" ? "blue" : "red"}`}>
-                  {mine.status === "confirmed_lunas" ? ` Lunas • ${mine.posisi}` : mine.status === "confirmed_langsung" ? ` Di tempat • ${mine.posisi}` : mine.status === "no_show" ? " No-show" : ` Wajib bayar • ${mine.posisi}`}
-                </span>}
+      <PageHead title="Jadwal main" desc="Pilih tanggal, lihat skuad, isi atau tarik list." />
+      <div className="page wrap">
+        {upcomingDates.length > 0 && (
+          <div className="datestrip" role="list" aria-label="Filter tanggal">
+            <button className="datechip" aria-pressed={!selected} onClick={() => setSelected(null)}>Semua<b>{upcoming.length}</b></button>
+            {upcomingDates.map((iso) => {
+              const d = new Date(iso + "T00:00:00");
+              return <button key={iso} className="datechip" aria-pressed={iso === selected} onClick={() => setSelected(iso)}>{DAYS[d.getDay()]}<b>{String(d.getDate()).padStart(2, "0")}</b></button>;
+            })}
+          </div>
+        )}
+        <p className="muted"><small>Kuota 28: GK 4, Belakang/Tengah/Depan masing-masing 8. Untuk jadwal liga, buka menu Liga.</small></p>
+        {terkunci && <div className="note err">{nLangsung > 0 ? `Kamu ada ${nLangsung}x bayar-di-tempat yang belum dikonfirmasi lunas admin. Selesaikan dulu untuk buka list berikutnya.` : "Kamu punya tunggakan. Lunasi ke admin dulu untuk buka list berikutnya."}</div>}
+        {jadwalBiasa.length === 0 && <Empty title="Belum ada jadwal. Admin buat di Kelola jadwal." />}
+        {upcoming.length === 0 && jadwalBiasa.length > 0 && <Empty title="Semua jadwal sudah lewat, menunggu jadwal baru dari admin." />}
+
+        {visible.map((s) => {
+          const list = db.rsvps.filter((r) => r.scheduleId === s.id && r.status !== "cancelled");
+          const mine = list.find((r) => r.userId === me.id);
+          const ka = kuotaAktif(s);
+          const penuh = list.length >= ka;
+          const ditutup = s.status === "tutup" || s.status === "full_booked";
+          const pos = posisiPilih[s.id] || "Depan";
+          const lewat2 = lewatH2(s);
+          return (
+            <div className="panel" key={s.id} id={`jad-${s.tanggal}`} style={{ marginBottom: 14 }}>
+              <div className="slot">
+                <DateBox iso={s.tanggal} />
+                <div style={{ flex: 1 }}>
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <b style={{ fontSize: 17 }}>{s.jam}</b>
+                    <StatusPill status={s.status} sisa={ka - list.length} />
+                  </div>
+                  <small className="muted">{s.lokasi}</small>
+                  <div style={{ marginTop: 6 }}><Meter filled={list.length} total={ka} /></div>
+                  <small className="muted">Batas tarik list: {fmtBatas(s)}</small>
+                  {mine && (
+                    <div style={{ marginTop: 4 }}>
+                      <span className={`pill ${mine.status === "confirmed_lunas" ? "ok" : mine.status === "confirmed_langsung" ? "info" : "bad"}`}>
+                        {mine.status === "confirmed_lunas" ? `Lunas (${mine.posisi})` : mine.status === "confirmed_langsung" ? `Bayar di tempat (${mine.posisi})` : mine.status === "no_show" ? "No-show" : `Wajib bayar (${mine.posisi})`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {s.status === "full_booked" && <div className="note err" style={{ marginTop: 10 }}>Lapangan full booked untuk tanggal ini.</div>}
+              {s.status === "tutup" && <div className="note warn" style={{ marginTop: 10 }}>Jadwal ini ditutup admin.</div>}
+              {s.status === "sparing" && <div className="note info" style={{ marginTop: 10 }}>Mode sparing, kuota 14 (GK 2, lainnya masing-masing 4). Cari lawan sparing.</div>}
+
+              <div className="row" style={{ marginTop: 10 }}>
+                {POSISI_MAIN.map((p) => {
+                  const isi = list.filter((r) => (r.posisi || "Depan") === p).length;
+                  const q = quotaPosisi(s, p);
+                  return <span key={p} className={`pill ${isi >= q ? "bad" : pos === p ? "ok" : "neutral"}`}>{p} {isi}/{q}</span>;
+                })}
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                {!mine ? (
+                  ditutup ? null : penuh ? <div className="note err">Kuota penuh, coba jadwal lain.</div> : terkunci ? null : (
+                    <>
+                      <label className="field"><span>Main sebagai</span>
+                        <select value={pos} disabled={busy} onChange={(e) => setPosisiPilih((v) => ({ ...v, [s.id]: e.target.value as PosisiMain }))}>
+                          {POSISI_MAIN.map((p) => { const isi = list.filter((r) => (r.posisi || "Depan") === p).length; const q = quotaPosisi(s, p); return <option key={p} value={p} disabled={isi >= q}>{p} — sisa {Math.max(0, q - isi)}{isi >= q ? " (penuh)" : ""}</option>; })}
+                        </select>
+                      </label>
+                      <div className="row">
+                        <button className="btn" disabled={busy} onClick={() => ikut(s, "deposit")}>Pakai 1 kredit ({pos}{pos === "GK" ? ", GK dulu" : ""})</button>
+                        <button className="btn ghost" disabled={busy} onClick={() => ikut(s, "langsung")}>Bayar cash di tempat (Rp{pos === "GK" ? "15.000" : "25.000"})</button>
+                      </div>
+                    </>
+                  )
+                ) : (
+                  lewat2 || mine.status === "wajib_bayar" || mine.status === "no_show"
+                    ? <div className="note warn">Lewat H-2 atau sudah wajib bayar, tidak bisa tarik list. Hubungi admin jika darurat.</div>
+                    : <button className="btn danger" disabled={busy} onClick={() => batal(s)}>Tarik list {mine.posisi} (batas {fmtBatas(s)})</button>
+                )}
+              </div>
+
+              <div className="lineup" style={{ marginTop: 12 }}>
+                {POSISI_MAIN.map((p) => {
+                  const names = list.filter((r) => (r.posisi || "Depan") === p).map((r) => db.users.find((u) => u.id === r.userId)?.nama || "-");
+                  return (
+                    <div key={p}>
+                      <h4>{p} {names.length > 0 ? `(${names.length})` : ""}</h4>
+                      {names.length === 0 ? <p className="muted"><small>Kosong</small></p> : names.map((n, i) => <p key={i} style={{ margin: "2px 0", fontSize: 13 }}>{n}</p>)}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-
-            {s.status === "full_booked" && <div className="banner err">Lapangan full booked untuk tanggal ini.</div>}
-            {s.status === "tutup" && <div className="banner warn">Jadwal ini ditutup admin.</div>}
-            {s.status === "sparing" && <div className="banner info">Mode sparing — kuota 14 (GK 2 • lainnya @4). Cari lawan sparing!</div>}
-
-            <div className="row" style={{ marginTop: 8 }}>
-              {POSISI_MAIN.map((p) => {
-                const isi = list.filter((r: any) => (r.posisi || "Depan") === p).length;
-                const q = quotaPosisi(s, p);
-                return <span key={p} className={`badge ${isi >= q ? "red" : pos === p ? "green" : "gray"}`}>{p} {isi}/{q}</span>;
-              })}
-            </div>
-
-            <div style={{ marginTop: 10 }}>
-              {!mine ? (
-                ditutup ? null : penuh ? <div className="banner err">Kuota penuh. Coba jadwal lain ya </div> : terkunci ? null : (
-                  <>
-                    <label><small className="muted"><b>Main sebagai:</b></small></label>
-                    <select value={pos} disabled={busy} onChange={(e) =>setPosisiPilih((v) => ({ ...v, [s.id]: e.target.value as PosisiMain }))}>
-                      {POSISI_MAIN.map((p) => {
-                        const isi = list.filter((r: any) => (r.posisi || "Depan") === p).length;
-                        const q = quotaPosisi(s, p);
-                        return <option key={p} value={p} disabled={isi >= q}>{p} — sisa {Math.max(0, q - isi)}{isi >= q ? " (PENUH)" : ""}</option>;
-                      })}
-                    </select>
-                    <button className="btn" disabled={busy} onClick={() =>ikut(s, "deposit")}> {pos} — Potong 1 Kredit{pos === "GK" ? " (GK dulu)" : ""}</button>
-                    <button className="btn secondary" disabled={busy} onClick={() =>ikut(s, "langsung")}> {pos} — Bayar Cash di Tempat ({pos === "GK" ? "15rb" : "25rb"})</button>
-                  </>
-                )
-              ) : (
-                h2 || mine.status === "wajib_bayar" || mine.status === "no_show"
-                  ? <div className="banner warn">Lewat H-2 / sudah wajib bayar — tidak bisa tarik list. Hubungi admin jika darurat.</div>
-                  : <button className="btn danger" disabled={busy} onClick={() =>batal(s)}>Tarik List ({mine.posisi}) — batas {fmtBatas(s)}</button>
-              )}
-            </div>
-            <div style={{ marginTop: 8 }}>
-              {POSISI_MAIN.map((p) => {
-                const names = list.filter((r: any) => (r.posisi || "Depan") === p).map((r: any) =>db.users.find((u: any) =>u.id === r.userId)?.nama);
-                if (names.length === 0) return null;
-                return <p key={p} className="muted" style={{ margin: "4px 0" }}><small><b>{p}:</b> {names.join(", ")}</small></p>;
-              })}
-              {list.length === 0 && !ditutup && <p className="muted"><small>— belum ada yang isi list —</small></p>}
-            </div>
-          </div>
-        );
-      })}
-      <p className="muted"><small>Aturan: tarik list terakhir H-2. Setelah itu tetap wajib bayar walau tidak datang. Belum bayar = tidak bisa ikut game berikutnya.</small></p>
+          );
+        })}
+        <p className="muted"><small>Aturan: tarik list terakhir H-2. Setelah itu tetap wajib bayar walau tidak datang. Belum bayar artinya tidak bisa ikut game berikutnya.</small></p>
+      </div>
     </div>
   );
 }

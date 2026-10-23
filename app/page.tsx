@@ -1,217 +1,131 @@
 "use client";
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { walletOf, totalKredit, dikunciRSVP } from "../lib/store";
-import { fetchAll, signUp, signIn, signOut, setujuAkad } from "../lib/db";
+import { useDB, Loading, LoadError, StatusPill, Meter, DateBox } from "../components/ui";
+import { AuthPanel, AkadGate } from "../components/Account";
+import { walletOf, totalKredit, dikunciRSVP, kuotaAktif, klasemen, teamNama } from "../lib/rules";
+import { signOut } from "../lib/data";
 import { BASECAMP } from "../lib/club";
-import { AKAD_JUDUL, AKAD_TEKS, AKAD_CHECKBOXES, AKAD_VERSION } from "../lib/akad";
+import { AKAD_VERSION } from "../lib/akad";
+
+function todayLocalISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 
 export default function Home() {
-  const [db, setDb] = useState<any>(null);
-  const [err, setErr] = useState("");
-  const reload = () => fetchAll().then(setDb).catch((e: any) => setErr(e.message));
-  useEffect(() => { reload(); }, []);
-  if (err) return <div className="card"><div className="banner err">{err}</div><p className="muted"><small>Cek env Supabase + koneksi.</small></p></div>;
-  if (!db) return <div className="card"><p>Memuat...</p></div>;
-  const me = db.users.find((u: any) => u.id === db.sessionId);
+  const { db, error, reload } = useDB();
+  if (error) return <div className="page wrap"><LoadError message={error} onRetry={reload} /></div>;
+  if (!db) return <div className="page wrap"><Loading what="beranda" /></div>;
 
-  const greet = (() => { const h=new Date().getHours(); if(h<11) return "Selamat pagi"; if(h<15) return "Selamat siang"; if(h<18) return "Selamat sore"; return "Selamat malam"; })();
-  function todayLocalISO(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
-  function labelTanggal(iso:string){ const d=new Date(iso+"T00:00:00"); const days=["Min","Sen","Sel","Rab","Kam","Jum","Sab"]; return {label:days[d.getDay()], num:String(d.getDate()).padStart(2,"0")}; }
+  const me = db.users.find((u) => u.id === db.sessionId);
   const todayISO = todayLocalISO();
-  const upcomingSchedules = db.schedules.filter((s:any)=> !s.is_liga && s.tanggal >= todayISO).sort((a:any,b:any)=> a.tanggal.localeCompare(b.tanggal));
-  const upcomingDates: string[] = (Array.from(new Set(upcomingSchedules.map((s:any)=> s.tanggal as string))) as string[]).sort();
-  const accentFor = (idx:number)=> ["accent-gold","accent-lilac","accent-pink","accent-teal","accent-blue"][idx%5];
+  const upcoming = db.schedules.filter((s) => !s.is_liga && s.tanggal >= todayISO).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+  const next = upcoming[0];
+  const dates = Array.from(new Set(upcoming.map((s) => s.tanggal))).sort();
+  const greet = (() => { const h = new Date().getHours(); if (h < 11) return "Selamat pagi"; if (h < 15) return "Selamat siang"; if (h < 18) return "Selamat sore"; return "Selamat malam"; })();
+  const standings = klasemen(db.matches).slice(0, 4);
+  const butuhAkad = me && (!me.setuju_akad || me.akad_version !== AKAD_VERSION);
 
   return (
-    <div>
-      {/* Oddsly greet header */}
-      <div className="greet">
-        <div>
-          <h2>{me ? `${greet},` : "Good morning,"} <span>{me ? me.nama.split(" ")[0] : "dear player"}</span></h2>
-          <p>{me ? `${totalKredit(walletOf(db, me.id))} kredit · ${me.is_member ? "Member" : "Non-member"} · ${BASECAMP}` : "Masjid Utsman Bin Affan · Main rutin tiap pekan"}</p>
-        </div>
-        <div className="avatar">{me ? me.nama.slice(0,1).toUpperCase() : "M"}</div>
-      </div>
-      {upcomingDates.length>0 ? (
-        <div className="date-strip">
-          {upcomingDates.slice(0,8).map((iso: string)=> { const {label,num}=labelTanggal(iso); return (
-            <Link key={iso} href={`/jadwal?tgl=${iso}`} className="date-pill has" style={{ textDecoration: "none" }}>
-              {label}<b>{num}</b>
-            </Link>
-          ); })}
-        </div>
-      ) : null}
-      <div className="hero">
-        <img src="/logo-muba.jpg" alt="MUBA FC" className="logo" />
-        <h1>MUBA FC</h1>
-        <p>Masjid Utsman Bin Affan · Main rutin tiap pekan</p>
-        <p><small style={{ color: "var(--muted)" }}>{BASECAMP}</small></p>
-        <div className="tagline">Hitam & Gold · Komunitas futsal masjid</div>
-      </div>
-      {!me ? (
-        <div className="card">
-          <h2>Selamat datang</h2>
-          <p className="muted">Daftar sekali, tunggu approve admin, langsung bisa isi list main.</p>
-          <div className="pricegrid">
-            <div className="price"><span className="muted">Sekali main</span><br /><b>Rp25rb</b><br /><small className="muted">1 kredit · GK Rp15rb</small></div>
-            <div className="price hot sel"><span className="tag">JADI MEMBER</span><span className="muted">Paket 4x main</span><br /><b>Rp90rb</b><br /><small className="muted">4 kredit + member permanen · GK Rp50rb</small></div>
-          </div>
-          <AuthBox onDone={reload} />
-        </div>
-      ) : (
-        <div>
-          <div className="saldo">
-            <small>Halo, {me.nama} · {me.role} · {me.status} {me.is_member ? "· Member" : ""}</small>
-            <div className="num">{totalKredit(walletOf(db, me.id))} kredit</div>
-            <small>Paket {walletOf(db, me.id).paket} · Reguler {walletOf(db, me.id).reguler} · GK {walletOf(db, me.id).paket_gk + walletOf(db, me.id).reguler_gk}</small>
-            <div className="row" style={{ marginTop: 14 }}>
-              <Link href="/topup" style={{ flex: 1 }}><button className="btn" style={{ background: "#D4AF37", color: "#111007" }}>Top-Up</button></Link>
-              <Link href="/jadwal" style={{ flex: 1 }}><button className="btn secondary">Isi List</button></Link>
+    <div className="page wrap">
+      <div className="panel dark">
+        {me ? (
+          <>
+            <h1 className="hero" style={{ fontSize: "clamp(22px,3.5vw,32px)" }}>{greet}, {me.nama.split(" ")[0]}</h1>
+            <p className="muted" style={{ marginTop: 4 }}>Saldo {totalKredit(walletOf(db, me.id))} kredit {me.is_member ? "— member" : ""}</p>
+          </>
+        ) : (
+          <>
+            <h1 className="hero">MUBA FC</h1>
+            <p className="muted" style={{ marginTop: 6 }}>{BASECAMP}</p>
+          </>
+        )}
+        {next ? (
+          <div style={{ marginTop: 18, maxWidth: 420 }}>
+            <h3 style={{ color: "var(--on-black)" }}>Main berikutnya</h3>
+            <p style={{ fontSize: 18, fontWeight: 800, margin: "4px 0" }}>{next.tanggal} &middot; {next.jam}</p>
+            <p className="muted" style={{ margin: "0 0 10px" }}>{next.lokasi}</p>
+            <Meter filled={db.rsvps.filter((r) => r.scheduleId === next.id && r.status !== "cancelled").length} total={kuotaAktif(next)} />
+            <div className="row" style={{ marginTop: 12 }}>
+              <Link href={`/jadwal?tgl=${next.tanggal}`}><button className="btn">Isi list tanggal ini</button></Link>
+              <Link href="/jadwal"><button className="btn ghost" style={{ borderColor: "var(--black-line)", color: "var(--on-black)" }}>Semua jadwal</button></Link>
             </div>
           </div>
-          {me.status === "pending" && (
-            <div className="banner warn">Akunmu menunggu approve admin. Hubungi pengurus di menu Kontak.</div>
-          )}
-          {(!me.setuju_akad || me.akad_version !== AKAD_VERSION) && (
-            <AkadPrompt userId={me.id} onDone={reload} />
-          )}
-          {dikunciRSVP(db, me.id) && (
-            <div className="banner err">Ada pembayaran yang belum beres — lunasi ke admin dulu.</div>
-          )}
-          <div className="row">
-            <button className="btn secondary small" onClick={() => signOut().then(reload)}>Logout</button>
-            <Link href="/liga"><button className="btn secondary small">Liga</button></Link>
-            <Link href="/kontak"><button className="btn secondary small">Kontak</button></Link>
+        ) : (
+          <div style={{ marginTop: 18 }}>
+            <p className="muted">{db.schedules.filter((s) => !s.is_liga).length === 0 ? "Belum ada jadwal main — tanya pengurus kapan main berikutnya." : "Semua jadwal sudah lewat, menunggu jadwal baru dari admin."}</p>
+            <div className="row" style={{ marginTop: 10 }}>
+              <Link href="/kontak"><button className="btn ghost" style={{ borderColor: "var(--black-line)", color: "var(--on-black)" }}>Tanya jadwal ke pengurus</button></Link>
+              <Link href="/klasemen"><button className="btn ghost" style={{ borderColor: "var(--black-line)", color: "var(--on-black)" }}>Lihat klasemen liga</button></Link>
+            </div>
+          </div>
+        )}
+        {!me && <div style={{ marginTop: 18 }}><a href="#akun"><button className="btn">Daftar untuk ikut main</button></a></div>}
+      </div>
+
+      {dates.length > 0 && (
+        <div className="datestrip" role="list" aria-label="Pilih tanggal jadwal">
+          {dates.slice(0, 8).map((iso) => {
+            const d = new Date(iso + "T00:00:00");
+            const days = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+            return <Link key={iso} href={`/jadwal?tgl=${iso}`} className="datechip">{days[d.getDay()]}<b>{String(d.getDate()).padStart(2, "0")}</b></Link>;
+          })}
+        </div>
+      )}
+
+      {me?.status === "pending" && <div className="note warn">Akunmu menunggu approve admin. Hubungi pengurus di menu Kontak.</div>}
+      {me && dikunciRSVP(db, me.id) && <div className="note err">Ada pembayaran yang belum beres, lunasi ke admin dulu.</div>}
+      {butuhAkad && me && <AkadGate userId={me.id} onDone={reload} />}
+
+      <div className="home-grid">
+        <div className="stack">
+          <div className="panel">
+            <div className="panel-h">
+              <div><h3>Jadwal terdekat</h3><p>Upcoming, tap tanggal di atas untuk filter</p></div>
+              <Link href="/jadwal" className="panel-link">{upcoming.length} upcoming</Link>
+            </div>
+            {upcoming.slice(0, 3).map((s) => {
+              const ikut = db.rsvps.filter((r) => r.scheduleId === s.id && r.status !== "cancelled").length;
+              const sisa = kuotaAktif(s) - ikut;
+              return (
+                <Link key={s.id} href={`/jadwal?tgl=${s.tanggal}`} className="slot" style={{ textDecoration: "none", color: "inherit", padding: "10px 0", borderBottom: "1px solid var(--line-2)" }}>
+                  <DateBox iso={s.tanggal} />
+                  <div style={{ flex: 1 }}>
+                    <b>{s.jam} &middot; {s.lokasi}</b>
+                    <div className="muted" style={{ fontSize: 13, margin: "2px 0 6px" }}>{ikut}/{kuotaAktif(s)} terisi, sisa {Math.max(0, sisa)}</div>
+                    <StatusPill status={s.status} sisa={sisa} />
+                  </div>
+                </Link>
+              );
+            })}
+            {upcoming.length === 0 && <p className="muted">{db.schedules.filter((x) => !x.is_liga).length === 0 ? "Belum ada jadwal. Admin buat di Kelola jadwal." : "Semua jadwal sudah lewat."}</p>}
+            <Link href="/jadwal"><button className="btn ghost block" style={{ marginTop: 10 }}>Lihat dan isi list</button></Link>
+          </div>
+
+          <div className="panel">
+            <div className="panel-h"><div><h3>Klasemen liga</h3><p>Ringkasan 4 tim</p></div><Link href="/klasemen" className="panel-link">Lihat lengkap</Link></div>
+            {standings.every((r) => r.M === 0) ? <p className="muted">Belum ada laga liga berjalan.</p> : (
+              <table className="table"><thead><tr><th>#</th><th>Tim</th><th className="n">M</th><th className="n">Poin</th></tr></thead>
+                <tbody>{standings.map((r, i) => <tr key={r.tim} className={i === 0 ? "lead" : ""}><td>{i + 1}</td><td>{teamNama(r.tim)}</td><td className="n">{r.M}</td><td className="n pts">{r.P}</td></tr>)}</tbody>
+              </table>
+            )}
           </div>
         </div>
-      )}
 
-      <div className="card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div className="page-head" style={{ margin: 0 }}><h3 style={{ margin: 0 }}>Jadwal terdekat</h3><p>Upcoming — tap tanggal di atas untuk filter</p></div>
-          <Link href="/jadwal" className="badge gold" style={{ textDecoration: "none" }}>{upcomingSchedules.length} upcoming</Link>
-        </div>
-        {upcomingSchedules.slice(0, 3).map((s: any, idx:number) => {
-          const ikut = db.rsvps.filter((r: any) => r.scheduleId === s.id && r.status !== "cancelled").length;
-          const sisa = (s.status === "sparing" ? 14 : s.kuota) - ikut;
-          const isLive = s.status === "buka" && sisa>0;
-          return (
-            <Link key={s.id} href={`/jadwal?tgl=${s.tanggal}`} style={{ textDecoration:"none" }}>
-              <div className={`match-card ${accentFor(idx)}`} style={{ margin: "10px 0" }}>
-                <div className="match-card-top">
-                  <div className="datebox" style={{ minWidth: 56 }}>{s.tanggal.slice(8,10)}<span>{s.tanggal.slice(5,7)}/{s.tanggal.slice(0,4)}</span></div>
-                  <div className="match-card-mid">
-                    <div className="match-card-title">{s.jam} · {s.lokasi}</div>
-                    <div className="match-card-sub">{s.tanggal} · {ikut}/{s.status === "sparing" ? 14 : s.kuota} terisi · sisa {Math.max(0,sisa)}</div>
-                    <div className="match-card-odds">
-                      <span className={isLive?"gold":""}>{isLive?"BUKA":""+s.status.toUpperCase()}</span>
-                      <span>Rp25rb</span><span style={{ opacity: 0.7 }}>GK 15rb</span>
-                    </div>
-                  </div>
-                </div>
+        <div className="stack">
+          {me ? (
+            <div className="panel dark">
+              <small className="muted">Kredit kamu</small>
+              <div className="bignum" style={{ margin: "4px 0" }}>{totalKredit(walletOf(db, me.id))}</div>
+              <small className="muted">Paket {walletOf(db, me.id).paket} &middot; Reguler {walletOf(db, me.id).reguler} &middot; GK {walletOf(db, me.id).paket_gk + walletOf(db, me.id).reguler_gk}</small>
+              <div className="row" style={{ marginTop: 14 }}>
+                <Link href="/topup" style={{ flex: 1 }}><button className="btn block">Top-up</button></Link>
+                <Link href="/jadwal" style={{ flex: 1 }}><button className="btn ghost block" style={{ borderColor: "var(--black-line)", color: "var(--on-black)" }}>Isi list</button></Link>
               </div>
-            </Link>
-          );
-        })}
-        {upcomingSchedules.length===0 && <p className="muted" style={{ fontSize:13 }}>{db.schedules.length===0 ? "Belum ada jadwal. Admin buat di Kelola Jadwal." : "Semua jadwal sudah lewat. Menunggu jadwal baru dari admin."}</p>}
-        <Link href="/jadwal"><button className="btn secondary" style={{ marginTop: 10 }}>Lihat dan isi list</button></Link>
-      </div>
-    </div>
-  );
-}
-
-function AkadPrompt({ userId, onDone }: { userId: string; onDone: () => void }) {
-  const [checks, setChecks] = useState<boolean[]>(Array(5).fill(false));
-  const [final, setFinal] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [show, setShow] = useState(false);
-  const all = checks.every(Boolean) && final;
-  const kirim = async () => {
-    if (!all) return;
-    setBusy(true);
-    try { await setujuAkad(userId, AKAD_VERSION); onDone(); }
-    catch (e: any) { alert(e.message); }
-    setBusy(false);
-  };
-  return (
-    <div className="card" style={{ borderColor: "var(--gold-deep)", background: "#1A180E" }}>
-      <h3>Akad Membership — wajib disetujui</h3>
-      {!show ? (
-        <><p className="muted"><small>{AKAD_JUDUL} — baca lengkap sebelum menyetujui.</small></p><button className="btn secondary" onClick={() => setShow(true)}>Baca Syarat &amp; Ketentuan</button></>
-      ) : (
-        <div style={{ maxHeight: 220, overflowY: "auto", background: "#0e0e10", border: "1px solid var(--line)", borderRadius: 12, padding: 12, whiteSpace: "pre-wrap", fontSize: 12 }}>{AKAD_TEKS}</div>
-      )}
-      <div style={{ marginTop: 10 }}>
-        {AKAD_CHECKBOXES.map((t, i) => (
-          <label key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "9px 0", fontSize: 13, lineHeight: 1.5, cursor: "pointer" }}><input type="checkbox" className="akad-chk" checked={checks[i]} onChange={(e) => setChecks((a) => a.map((v, k) => k === i ? e.target.checked : v))} /> <span>{t}</span></label>
-        ))}
-        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "12px 0", fontWeight: 700, fontSize: 13, background: "rgba(212,175,55,0.10)", padding: "10px 12px", borderRadius: 10, cursor: "pointer", lineHeight: 1.5 }}><input type="checkbox" className="akad-chk" checked={final} onChange={(e) => setFinal(e.target.checked)} /> <span>Saya telah membaca, memahami, dan menyetujui Syarat dan Ketentuan Membership Futsal.</span></label>
-      </div>
-      <button className="btn" disabled={!all || busy} onClick={kirim}>{busy ? "Menyimpan..." : "Saya Setuju & Lanjut"}</button>
-      <p className="muted"><small>Versi {AKAD_VERSION} · Wajib untuk lanjut pakai web.</small></p>
-    </div>
-  );
-}
-
-function AuthBox({ onDone }: { onDone: () => void }) {
-  const [mode, setMode] = useState<"login" | "daftar">("daftar");
-  const [nama, setNama] = useState(""); const [wa, setWa] = useState("");
-  const [email, setEmail] = useState(""); const [pass, setPass] = useState("");
-  const [msg, setMsg] = useState("");
-  const [checks, setChecks] = useState<boolean[]>(Array(5).fill(false));
-  const [final, setFinal] = useState(false);
-  const [showAkad, setShowAkad] = useState(false);
-  const needAkad = mode === "daftar";
-  const allAkad = !needAkad || (checks.every(Boolean) && final);
-  const submit = async () => {
-    setMsg("");
-    try {
-      if (mode === "daftar") {
-        if (!nama || !wa || !email || !pass) return setMsg("Isi Nama, WA, Email, dan Password dulu ya");
-        if (!allAkad) return setMsg("Centang semua akad dulu — wajib untuk daftar.");
-        await signUp(email.trim(), pass, nama.trim(), wa.trim());
-        try { const { supa } = await import("../lib/supabase"); const { data } = await supa().auth.getSession(); const uid = data.session?.user?.id; if (uid) await setujuAkad(uid, AKAD_VERSION); } catch {}
-        setMsg("Terdaftar! Menunggu approve admin.");
-      } else {
-        if (!email || !pass) return setMsg("Isi Email dan Password");
-        await signIn(email.trim(), pass);
-      }
-      onDone();
-    } catch (e: any) { setMsg(e.message || "Gagal"); }
-  };
-  return (
-    <div style={{ marginTop: 12 }}>
-      <div className="row">
-        <button className="btn secondary small" onClick={() => setMode("daftar")}>Daftar baru</button>
-        <button className="btn secondary small" onClick={() => setMode("login")}>Sudah punya akun</button>
-      </div>
-      {mode === "daftar" && (<>
-        <input placeholder="Nama lengkap" value={nama} onChange={(e) => setNama(e.target.value)} />
-        <input placeholder="No WA, cth 0812xxxx" value={wa} onChange={(e) => setWa(e.target.value)} />
-      </>)}
-      <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <input placeholder="Password (min 6 karakter)" type="password" value={pass} onChange={(e) => setPass(e.target.value)} />
-      {mode === "daftar" && (
-        <div style={{ border: "1px solid var(--line)", borderRadius: 14, padding: 12, margin: "8px 0", background: "#141416" }}>
-          {!showAkad ? <button className="btn secondary small" onClick={() => setShowAkad(true)}>Baca &amp; Setujui Akad</button> : (
-            <>
-              <h4 style={{ margin: "4px 0" }}>{AKAD_JUDUL}</h4>
-              <div style={{ maxHeight: 180, overflowY: "auto", background: "#0e0e10", border: "1px solid var(--line)", borderRadius: 10, padding: 10, whiteSpace: "pre-wrap", fontSize: 11 }}>{AKAD_TEKS}</div>
-              <div style={{ marginTop: 8 }}>
-                {AKAD_CHECKBOXES.map((t, i) => (
-                  <label key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "9px 0", fontSize: 12, lineHeight: 1.5, cursor: "pointer" }}><input type="checkbox" className="akad-chk" checked={checks[i]} onChange={(e) => setChecks((a) => a.map((v, k) => k === i ? e.target.checked : v))} /> <span>{t}</span></label>
-                ))}
-                <label style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "12px 0", fontWeight: 700, fontSize: 12, background: "rgba(212,175,55,0.10)", padding: "10px 12px", borderRadius: 10, cursor: "pointer", lineHeight: 1.5 }}><input type="checkbox" className="akad-chk" checked={final} onChange={(e) => setFinal(e.target.checked)} /> <span>Saya telah membaca, memahami, dan menyetujui Syarat dan Ketentuan Membership Futsal.</span></label>
-              </div>
-            </>
+              <button className="linkbtn" style={{ marginTop: 14, color: "var(--on-black-2)", borderColor: "var(--black-line)" }} onClick={() => signOut().then(reload)}>Keluar</button>
+            </div>
+          ) : (
+            <div className="panel"><AuthPanel onDone={reload} /></div>
           )}
-          <p className="muted"><small>Versi {AKAD_VERSION} · Wajib dicentang semua untuk daftar.</small></p>
         </div>
-      )}
-      <button className="btn" onClick={submit}>{mode === "daftar" ? "Daftar Sekarang" : "Masuk"}</button>
-      {msg && <p style={{ marginTop: 8, fontSize: 13 }}>{msg}</p>}
-      <p className="muted"><small>Setelah daftar, statusmu <b>pending</b> sampai di-approve admin.</small></p>
+      </div>
     </div>
   );
 }

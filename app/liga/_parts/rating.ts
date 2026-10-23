@@ -1,5 +1,9 @@
-// Rubrik v1 MUBA FC — base 6.0, clamp 3.0-10.0, 1 desimal
-// Assist +0.5 semua posisi, blunder maks total -1, aksi kunci 3 jenis, override ±0.5 wajib catatan
+// Rubrik v1 MUBA FC — base 6.0, clamp 3.0-10.0, 1 desimal.
+// Assist +0.5 semua posisi, blunder maks total -1, aksi kunci 3 jenis, override wajib catatan.
+//
+// Semantik override (diputuskan saat redesign): PENYESUAIAN ±0.5 dari nilai_oto, bukan angka
+// pengganti penuh — finalNilai() di bawah ini yang dipakai di mana pun nilai akhir ditampilkan
+// (match centre maupun klasemen), supaya konsisten di seluruh web.
 
 export type Kartu = "tidak" | "kuning" | "merah";
 export type PosisiRB = "GK" | "Belakang" | "Tengah" | "Depan";
@@ -25,20 +29,17 @@ export function hitungNilaiOto(inp: InputRB): HasilRB {
   let nilai = 6.0;
   const parts: string[] = ["6.0 base"];
 
-  // Gol
   const golBobot: Record<PosisiRB, number> = { GK: 0.5, Belakang: 1.0, Tengah: 1.0, Depan: 1.2 };
   if (inp.gol > 0) {
     const add = inp.gol * golBobot[inp.posisi];
     nilai += add;
     parts.push(`+${add.toFixed(1)} gol x${inp.gol}`);
   }
-  // Assist +0.5 semua
   if (inp.assist > 0) {
     const add = inp.assist * 0.5;
     nilai += add;
     parts.push(`+${add.toFixed(1)} assist x${inp.assist}`);
   }
-  // Aksi kunci by posisi
   if (inp.posisi === "GK") {
     const add = Math.min(inp.aksi_kunci * 0.4, 2.0);
     if (add > 0) { nilai += add; parts.push(`+${add.toFixed(1)} save x${inp.aksi_kunci}`); }
@@ -57,12 +58,10 @@ export function hitungNilaiOto(inp: InputRB): HasilRB {
     if (addShot > 0) { nilai += addShot; parts.push(`+${addShot.toFixed(1)} SoT x${inp.shot_on_target}`); }
   }
 
-  // Clean sheet oto
   if (inp.cleanSheet) {
     const add = inp.posisi === "GK" ? 1.5 : inp.posisi === "Belakang" ? 1.0 : inp.posisi === "Tengah" ? 0.5 : 0;
     if (add > 0) { nilai += add; parts.push(`+${add.toFixed(1)} clean sheet`); }
   }
-  // Kebobolan
   if (inp.posisi === "GK" && inp.kebobolan > 0) {
     const dec = Math.min(inp.kebobolan * 0.3, 1.5);
     nilai -= dec;
@@ -73,17 +72,14 @@ export function hitungNilaiOto(inp: InputRB): HasilRB {
     nilai -= dec;
     parts.push(`-${dec.toFixed(1)} kebobolan x${inp.kebobolan}`);
   }
-  // Kartu
   if (inp.kartu === "kuning") { nilai -= 0.5; parts.push("-0.5 kuning"); }
   if (inp.kartu === "merah") { nilai -= 1.5; parts.push("-1.5 merah"); }
-  // Blunder maks total -1
   if (inp.blunder > 0) {
     const dec = Math.min(inp.blunder * 1.0, 1.0);
     nilai -= dec;
     parts.push(`-${dec.toFixed(1)} blunder x${inp.blunder}`);
   }
 
-  // Clamp
   nilai = Math.max(3.0, Math.min(10.0, nilai));
   nilai = Math.round(nilai * 10) / 10;
   return { nilai_oto: nilai, breakdown: parts.join(" | ") };
@@ -96,6 +92,7 @@ export function clampOverride(nilaiOto: number, override?: number | null): numbe
   return Math.round(final * 10) / 10;
 }
 
+/** Nilai akhir pemain: nilai_oto + override (±0.5, diklem 3..10). Dipakai di match centre dan klasemen. */
 export function finalNilai(nilaiOto: number, override?: number | null): number {
   const c = clampOverride(nilaiOto, override);
   return c ?? nilaiOto;

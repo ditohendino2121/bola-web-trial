@@ -66,6 +66,33 @@ const mapTx = (t: any): Tx => ({
   paket: t.paket, bukti: t.bukti, catatan: t.catatan, privateNote: t.private_note, isGk: !!t.is_gk,
 });
 
+export const mapMatch = (m: any): Match => ({
+  id: m.id, home: m.home, away: m.away, sh: m.sh, sa: m.sa,
+  goals: m.goals || [], tanggal: m.tanggal || "", jam: m.jam || "", lokasi: m.lokasi || "", edition_id: m.edition_id || null, penalti_pemenang: m.penalti_pemenang || null,
+});
+export const mapPlayerStat = (p: any): PlayerStat => ({
+  id: p.id, match_id: p.match_id, user_id: p.user_id, team: p.team, posisi: p.posisi, gol: p.gol, assist: p.assist, aksi_kunci: p.aksi_kunci, shot_on_target: p.shot_on_target, kartu: p.kartu, blunder: p.blunder, nilai_oto: p.nilai_oto, override: p.override, catatan_override: p.catatan_override, kebobolan: p.kebobolan ?? null,
+});
+
+/** Ambil ulang 1 laga + catatan pemainnya saja (ringan), lalu gabungkan ke DB yang sudah dimuat. */
+export async function loadMatch(matchId: string): Promise<{ match: Match | null; stats: PlayerStat[] }> {
+  const sb = supa();
+  const [m, ps] = await Promise.all([
+    sb.from("league_matches").select("*").eq("id", matchId).maybeSingle(),
+    sb.from("league_player_stats").select("*").eq("match_id", matchId),
+  ]);
+  if (m.error) throw new Error(m.error.message);
+  if (ps.error) throw new Error(ps.error.message);
+  return { match: m.data ? mapMatch(m.data) : null, stats: (ps.data || []).map(mapPlayerStat) };
+}
+export function mergeMatch(db: DB, matchId: string, match: Match | null, stats: PlayerStat[]): DB {
+  return {
+    ...db,
+    matches: match ? db.matches.map((x) => (x.id === matchId ? match : x)) : db.matches,
+    playerStats: [...db.playerStats.filter((p) => p.match_id !== matchId), ...stats],
+  };
+}
+
 export async function sessionId(): Promise<string | null> {
   const { data } = await supa().auth.getSession();
   return data.session?.user?.id || null;
@@ -110,15 +137,10 @@ export async function loadAll(): Promise<DB> {
     wallets: wrec,
     teams,
     pool,
-    matches: (matches.data || []).map((m: any) => ({
-      id: m.id, home: m.home, away: m.away, sh: m.sh, sa: m.sa,
-      goals: m.goals || [], tanggal: m.tanggal || "", jam: m.jam || "", lokasi: m.lokasi || "", edition_id: m.edition_id || null, penalti_pemenang: m.penalti_pemenang || null,
-    })),
+    matches: (matches.data || []).map(mapMatch),
     leagueLocked: !!meta.data?.locked,
     editions: (editions.data || []).map((e: any) => ({ id: e.id, label: e.label, tanggal: e.tanggal, created_at: e.created_at })),
-    playerStats: (playerStats.data || []).map((p: any) => ({
-      id: p.id, match_id: p.match_id, user_id: p.user_id, team: p.team, posisi: p.posisi, gol: p.gol, assist: p.assist, aksi_kunci: p.aksi_kunci, shot_on_target: p.shot_on_target, kartu: p.kartu, blunder: p.blunder, nilai_oto: p.nilai_oto, override: p.override, catatan_override: p.catatan_override, kebobolan: p.kebobolan ?? null,
-    })),
+    playerStats: (playerStats.data || []).map(mapPlayerStat),
     expenses: expenses.data || [],
     incomes: incomes.data || [],
     settings: settings.data

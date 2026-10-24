@@ -242,6 +242,7 @@ body.nav-open .drawer { transform: translateX(0); }
 .layar { min-height: 100vh; background: var(--black); color: var(--on-black); padding: 2vw 3vw; display: flex; flex-direction: column; }
 .layar-msg { margin: auto; font-size: 2vw; color: var(--on-black-2); }
 .layar-top { display: flex; justify-content: space-between; align-items: center; font-size: 1.6vw; color: var(--gold-hi); font-weight: 700; border-bottom: 4px solid var(--gold); padding-bottom: 1vw; }
+.layar-live { margin-left: 1vw; background: var(--bad); color: #fff; font-size: 1vw; padding: 2px 8px; border-radius: var(--r-1); vertical-align: middle; }
 .layar-fs { background: transparent; border: 1px solid var(--black-line); color: var(--on-black-2); border-radius: var(--r-2); padding: 6px 12px; cursor: pointer; font-size: 13px; }
 .layar-main { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr; gap: 3vw; align-items: start; padding-top: 3vw; }
 .layar-side { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1vw; min-width: 0; }

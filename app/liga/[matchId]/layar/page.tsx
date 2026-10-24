@@ -1,20 +1,39 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useDB, Crest } from "../../../../components/ui";
 import Icon from "../../../../components/Icon";
+import { supa } from "../../../../lib/supa";
+import { loadMatch, mergeMatch } from "../../../../lib/data";
 import { teamNama, urutkanPosisi } from "../../../../lib/rules";
 
-// Tampilan layar besar (proyektor/TV): skor, line up, pencetak gol. Tanpa menu, refresh otomatis.
+// Tampilan layar besar (proyektor/TV): skor, line up, pencetak gol. Tanpa menu.
+// Live lewat Supabase Realtime (migration_liga_v5.sql); cadangan cek ringan tiap 5 detik.
 export default function LayarSkor() {
   const params = useParams() as any;
   const matchId = params.matchId as string;
-  const { db, error, reload } = useDB();
+  const { db, error, setDb } = useDB();
+  const [live, setLive] = useState(false);
 
   useEffect(() => {
-    const id = setInterval(() => { reload(); }, 10000);
-    return () => clearInterval(id);
-  }, [reload]);
+    let aktif = true;
+    const segarkan = async () => {
+      try {
+        const { match, stats } = await loadMatch(matchId);
+        if (aktif) setDb((prev) => (prev ? mergeMatch(prev, matchId, match, stats) : prev));
+      } catch { /* koneksi putus sesaat — coba lagi di putaran berikutnya */ }
+    };
+    let channel: ReturnType<ReturnType<typeof supa>["channel"]> | null = null;
+    try {
+      channel = supa()
+        .channel(`layar-${matchId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "league_matches", filter: `id=eq.${matchId}` }, segarkan)
+        .on("postgres_changes", { event: "*", schema: "public", table: "league_player_stats", filter: `match_id=eq.${matchId}` }, segarkan)
+        .subscribe((st) => { if (aktif) setLive(st === "SUBSCRIBED"); });
+    } catch { /* env kosong — tetap pakai polling */ }
+    const id = setInterval(segarkan, 5000);
+    return () => { aktif = false; clearInterval(id); if (channel) supa().removeChannel(channel); };
+  }, [matchId, setDb]);
 
   if (error) return <div className="layar"><p className="layar-msg">{error}</p></div>;
   if (!db) return <div className="layar"><p className="layar-msg">Memuat...</p></div>;
@@ -50,7 +69,7 @@ export default function LayarSkor() {
   return (
     <div className="layar">
       <div className="layar-top">
-        <span>{edisi?.label || "KIM x DnA Health League"}</span>
+        <span>{edisi?.label || "KIM x DnA Health League"} {live && <span className="layar-live">LIVE</span>}</span>
         <button className="layar-fs" onClick={() => document.documentElement.requestFullscreen?.()}>Layar penuh</button>
       </div>
       <div className="layar-main">

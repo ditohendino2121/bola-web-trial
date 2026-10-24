@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useDB, Loading, LoadError, Crest, Empty, CardTag } from "../../../components/ui";
 import Icon from "../../../components/Icon";
 import { supa } from "../../../lib/supa";
+import { mapPlayerStat } from "../../../lib/data";
 import { teamNama, urutkanPosisi, hitungSkorsing } from "../../../lib/rules";
 
 type Kartu = "tidak" | "kuning" | "kuning2" | "merah";
@@ -14,6 +15,7 @@ const KARTU_OPSI: { k: Kartu; label: string }[] = [
   { k: "kuning2", label: "2 kartu kuning (merah)" },
   { k: "merah", label: "Merah langsung" },
 ];
+const JEDA_SIMPAN = 500; // ms setelah berhenti mengetik baru disimpan
 
 function KartuIkon({ k }: { k: Kartu }) {
   if (k === "tidak") return <>-</>;
@@ -25,29 +27,39 @@ function KartuIkon({ k }: { k: Kartu }) {
 export default function LigaDetail() {
   const params = useParams() as any;
   const matchId = params.matchId as string;
-  const { db, error, reload } = useDB();
+  const { db, error, reload, setDb } = useDB();
   const [busy, setBusy] = useState(false);
   const [sh, setSh] = useState(""); const [sa, setSa] = useState("");
   const [rows, setRows] = useState<any[]>([]);
+  const [status, setStatus] = useState<"" | "menyimpan" | "tersimpan" | "gagal">("");
+  const initFor = useRef<string | null>(null);
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  // Isi form dari database SEKALI per laga (bukan tiap db berubah), supaya ketikan yang belum
+  // tersimpan tidak tertimpa saat data lokal diperbarui setelah simpan.
   useEffect(() => {
-    if (!db) return;
+    if (!db || initFor.current === matchId) return;
     const m = db.matches.find((x) => x.id === matchId);
-    if (m) { setSh(m.sh !== null ? String(m.sh) : ""); setSa(m.sa !== null ? String(m.sa) : ""); }
-    const homeMembers = urutkanPosisi(db.teams[m?.home || ""] || []);
-    const awayMembers = urutkanPosisi(db.teams[m?.away || ""] || []);
-    const all = [...homeMembers.map((x) => ({ ...x, team: m?.home })), ...awayMembers.map((x) => ({ ...x, team: m?.away }))];
+    if (!m) return;
+    initFor.current = matchId;
+    setSh(m.sh !== null ? String(m.sh) : ""); setSa(m.sa !== null ? String(m.sa) : "");
+    const all = [
+      ...urutkanPosisi(db.teams[m.home] || []).map((x) => ({ ...x, team: m.home })),
+      ...urutkanPosisi(db.teams[m.away] || []).map((x) => ({ ...x, team: m.away })),
+    ];
     const existing = db.playerStats.filter((p) => p.match_id === matchId);
     setRows(all.map((mem) => {
       const ex = existing.find((e) => e.user_id === mem.userId);
       return {
         user_id: mem.userId, team: mem.team, posisi: mem.posisi,
         nama: db.users.find((u) => u.id === mem.userId)?.nama || mem.userId,
-        gol: ex?.gol ?? 0, kartu: (ex?.kartu as Kartu) ?? "tidak",
+        gol: ex ? String(ex.gol ?? 0) : "0", kartu: (ex?.kartu as Kartu) ?? "tidak",
         kebobolan: ex?.kebobolan === null || ex?.kebobolan === undefined ? "" : String(ex.kebobolan),
       };
     }));
   }, [db, matchId]);
+
+  useEffect(() => () => { Object.values(timers.current).forEach(clearTimeout); }, []);
 
   if (error) return <div className="page wrap"><LoadError message={error} onRetry={reload} /></div>;
   if (!db) return <div className="page wrap"><Loading what="detail laga" /></div>;
@@ -56,86 +68,94 @@ export default function LigaDetail() {
   const match = db.matches.find((x) => x.id === matchId);
   if (!match) return <div className="page wrap"><Empty title="Laga tidak ditemukan" action={<div className="row" style={{ justifyContent: "center", marginTop: 10 }}><Link href="/liga"><button className="btn ghost">Ke Liga</button></Link><Link href="/klasemen"><button className="btn ghost">Ke Klasemen</button></Link></div>} /></div>;
 
-  const skorLengkap = match.sh !== null && match.sa !== null;
-  const imbang = skorLengkap && match.sh === match.sa;
+  // Tampilan atas pakai nilai yang sedang diketik (langsung berubah, tidak menunggu database).
+  const skorLengkap = sh !== "" && sa !== "";
+  const imbang = skorLengkap && sh === sa;
   const skorsing = hitungSkorsing(db.matches, db.playerStats, db.teams);
 
-  // Skor tersimpan otomatis saat kolom ditinggalkan (tanpa tombol simpan).
+  const patchMatchLokal = (patch: any) => setDb((prev) => prev ? { ...prev, matches: prev.matches.map((m) => (m.id === matchId ? { ...m, ...patch } : m)) } : prev);
+
+  const jalankan = async (fn: () => Promise<void>) => {
+    setStatus("menyimpan");
+    try { await fn(); setStatus("tersimpan"); }
+    catch (e: any) { setStatus("gagal"); alert(e.message); }
+  };
+  const antre = (key: string, fn: () => Promise<void>, segera = false) => {
+    clearTimeout(timers.current[key]);
+    if (segera) { delete timers.current[key]; jalankan(fn); return; }
+    setStatus("menyimpan");
+    timers.current[key] = setTimeout(() => { delete timers.current[key]; jalankan(fn); }, JEDA_SIMPAN);
+  };
+
   const simpanSkor = async (nextSh: string, nextSa: string) => {
-    if (!isAdmin) return;
     const shNum = nextSh === "" ? null : parseInt(nextSh);
     const saNum = nextSa === "" ? null : parseInt(nextSa);
-    if (shNum === match.sh && saNum === match.sa) return;
     const patch: any = { sh: shNum, sa: saNum };
     if (shNum === null || saNum === null || shNum !== saNum) patch.penalti_pemenang = null; // bukan imbang -> adu penalti tidak berlaku
-    setBusy(true);
-    try {
-      const { error: e } = await supa().from("league_matches").update(patch).eq("id", matchId);
-      if (e) throw new Error(e.message);
-      await reload();
-    } catch (e: any) { alert(e.message); }
-    setBusy(false);
+    const { error: e } = await supa().from("league_matches").update(patch).eq("id", matchId);
+    if (e) throw new Error(e.message);
+    patchMatchLokal(patch);
+  };
+  const ubahSkor = (sisiTim: "h" | "a", v: string) => {
+    const nilai = v.replace(/\D/g, "");
+    const nextSh = sisiTim === "h" ? nilai : sh;
+    const nextSa = sisiTim === "a" ? nilai : sa;
+    if (sisiTim === "h") setSh(nilai); else setSa(nilai);
+    antre("skor", () => simpanSkor(nextSh, nextSa));
   };
 
-  const simpanPenalti = async (tim: string | null) => {
-    if (!isAdmin) return;
-    setBusy(true);
-    try {
-      const { error: e } = await supa().from("league_matches").update({ penalti_pemenang: tim }).eq("id", matchId);
-      if (e) throw new Error(e.message);
-      await reload();
-    } catch (e: any) { alert(e.message); }
-    setBusy(false);
-  };
+  const simpanPenalti = (tim: string | null) => antre("penalti", async () => {
+    const { error: e } = await supa().from("league_matches").update({ penalti_pemenang: tim }).eq("id", matchId);
+    if (e) throw new Error(e.message);
+    patchMatchLokal({ penalti_pemenang: tim });
+  }, true);
 
-  const simpanPenilaian = async () => {
-    if (!isAdmin) return;
-    const golHome = rows.filter((r) => r.team === match.home).reduce((a, c) => a + Number(c.gol || 0), 0);
-    const golAway = rows.filter((r) => r.team === match.away).reduce((a, c) => a + Number(c.gol || 0), 0);
-    if (match.sh !== null && golHome !== match.sh && !confirm(`Total gol ${teamNama(match.home)} di tabel = ${golHome}, tapi skor = ${match.sh}. Tetap simpan?`)) return;
-    if (match.sa !== null && golAway !== match.sa && !confirm(`Total gol ${teamNama(match.away)} di tabel = ${golAway}, tapi skor = ${match.sa}. Tetap simpan?`)) return;
-    setBusy(true);
-    try {
-      // Kolom rubrik lama (assist, aksi, SoT, blunder, nilai) tidak dipakai lagi — diisi default.
-      const payload = rows.map((r) => ({
-        match_id: matchId, user_id: r.user_id, team: r.team, posisi: r.posisi,
-        gol: Number(r.gol) || 0, kartu: r.kartu,
-        kebobolan: r.posisi === "GK" && r.kebobolan !== "" ? Number(r.kebobolan) : null,
-        assist: 0, aksi_kunci: 0, shot_on_target: 0, blunder: 0, nilai_oto: null, override: null, catatan_override: "",
-      }));
-      const { error: e } = await supa().from("league_player_stats").upsert(payload, { onConflict: "match_id,user_id" });
-      if (e) throw new Error(e.message);
-      await reload();
-    } catch (e: any) { alert(e.message); }
-    setBusy(false);
+  // Kolom rubrik lama (assist, aksi, SoT, blunder, nilai) tidak dipakai lagi — diisi default.
+  const simpanBaris = async (r: any) => {
+    const { data, error: e } = await supa().from("league_player_stats").upsert({
+      match_id: matchId, user_id: r.user_id, team: r.team, posisi: r.posisi,
+      gol: Number(r.gol) || 0, kartu: r.kartu,
+      kebobolan: r.posisi === "GK" && r.kebobolan !== "" ? Number(r.kebobolan) : null,
+      assist: 0, aksi_kunci: 0, shot_on_target: 0, blunder: 0, nilai_oto: null, override: null, catatan_override: "",
+    }, { onConflict: "match_id,user_id" }).select().single();
+    if (e) throw new Error(e.message);
+    const ps = mapPlayerStat(data);
+    setDb((prev) => prev ? { ...prev, playerStats: [...prev.playerStats.filter((p) => !(p.match_id === matchId && p.user_id === r.user_id)), ps] } : prev);
+  };
+  const ubahBaris = (idx: number, patch: any, segera = false) => {
+    const baru = { ...rows[idx], ...patch };
+    setRows((prev) => prev.map((r, i) => (i === idx ? baru : r)));
+    antre(`row-${baru.user_id}`, () => simpanBaris(baru), segera);
   };
 
   // Reset total: skor, adu penalti, dan semua catatan pemain laga ini kembali kosong.
   const resetPertandingan = async () => {
     if (!isAdmin || !confirm("Reset pertandingan ini? Skor, adu penalti, gol, kebobolan, dan kartu semuanya dihapus. Tidak bisa dibatalkan.")) return;
+    Object.values(timers.current).forEach(clearTimeout); timers.current = {};
     setBusy(true);
     try {
       const { error: e1 } = await supa().from("league_player_stats").delete().eq("match_id", matchId);
       if (e1) throw new Error(e1.message);
       const { error: e2 } = await supa().from("league_matches").update({ sh: null, sa: null, penalti_pemenang: null }).eq("id", matchId);
       if (e2) throw new Error(e2.message);
+      initFor.current = null;
       await reload();
+      setStatus("");
     } catch (e: any) { alert(e.message); }
     setBusy(false);
   };
 
-  const updateRow = (idx: number, patch: any) => setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  const golTim = (team: string) => rows.filter((r) => r.team === team).reduce((a, c) => a + (Number(c.gol) || 0), 0);
+  const selisihGol = skorLengkap && (golTim(match.home) !== Number(sh) || golTim(match.away) !== Number(sa));
 
-  // Pencetak gol & kartu per tim (live-score style), di bawah logo masing-masing.
+  // Pencetak gol & kartu per tim (dari isian lokal, jadi langsung muncul).
   const statLines = (team: string) => {
-    const saved = db.playerStats.filter((p) => p.match_id === matchId && p.team === team);
-    const nama = (id: string) => db.users.find((u) => u.id === id)?.nama || id;
+    const tim = rows.filter((r) => r.team === team);
     return [
-      ...saved.filter((p) => (p.gol || 0) > 0).map((p) => <div key={`${p.user_id}-g`} className="statline"><Icon name="ball" /><span>{nama(p.user_id)} - {p.gol}</span></div>),
-      ...saved.filter((p) => p.kartu && p.kartu !== "tidak").map((p) => <div key={`${p.user_id}-k`} className="statline"><KartuIkon k={p.kartu as Kartu} /><span>{nama(p.user_id)}</span></div>),
+      ...tim.filter((r) => Number(r.gol) > 0).map((r) => <div key={`${r.user_id}-g`} className="statline"><Icon name="ball" /><span>{r.nama} - {Number(r.gol)}</span></div>),
+      ...tim.filter((r) => r.kartu !== "tidak").map((r) => <div key={`${r.user_id}-k`} className="statline"><KartuIkon k={r.kartu} /><span>{r.nama}</span></div>),
     ];
   };
-
   const sisi = (team: string) => (
     <div className="mc-side">
       <Crest team={team} size="lg" />
@@ -143,6 +163,8 @@ export default function LigaDetail() {
       <div className="stack" style={{ gap: 2 }}>{statLines(team)}</div>
     </div>
   );
+
+  const labelStatus = status === "menyimpan" ? "Menyimpan..." : status === "tersimpan" ? "Tersimpan" : status === "gagal" ? "Gagal menyimpan" : "";
 
   return (
     <div>
@@ -155,7 +177,7 @@ export default function LigaDetail() {
           <div className="mc">
             {sisi(match.home)}
             <div className="mc-score">
-              <div className="mc-num">{skorLengkap ? `${match.sh} - ${match.sa}` : "vs"}</div>
+              <div className="mc-num">{skorLengkap ? `${sh} - ${sa}` : "vs"}</div>
               {imbang && match.penalti_pemenang && <small>Adu penalti: {teamNama(match.penalti_pemenang)} menang</small>}
               {imbang && !match.penalti_pemenang && <small>Imbang, adu penalti belum diisi</small>}
               <small>{match.tanggal} {match.jam}</small>
@@ -166,13 +188,15 @@ export default function LigaDetail() {
       </div>
 
       <div className="page wrap">
+        {isAdmin && labelStatus && <div className={`note ${status === "gagal" ? "err" : status === "tersimpan" ? "ok" : "info"}`} role="status">{labelStatus}</div>}
+
         {isAdmin && (
           <div className="panel">
             <h3>Skor</h3>
-            <p className="muted"><small>Tersimpan otomatis begitu kolom ditinggalkan.</small></p>
+            <p className="muted"><small>Tersimpan otomatis setengah detik setelah selesai mengetik.</small></p>
             <div className="grid2">
-              <label className="field"><span>Skor {teamNama(match.home)}</span><input inputMode="numeric" value={sh} placeholder="0" disabled={busy} onChange={(e) => setSh(e.target.value.replace(/\D/g, ""))} onBlur={() => simpanSkor(sh, sa)} /></label>
-              <label className="field"><span>Skor {teamNama(match.away)}</span><input inputMode="numeric" value={sa} placeholder="0" disabled={busy} onChange={(e) => setSa(e.target.value.replace(/\D/g, ""))} onBlur={() => simpanSkor(sh, sa)} /></label>
+              <label className="field"><span>Skor {teamNama(match.home)}</span><input inputMode="numeric" value={sh} placeholder="0" disabled={busy} onChange={(e) => ubahSkor("h", e.target.value)} /></label>
+              <label className="field"><span>Skor {teamNama(match.away)}</span><input inputMode="numeric" value={sa} placeholder="0" disabled={busy} onChange={(e) => ubahSkor("a", e.target.value)} /></label>
             </div>
             {imbang && (
               <div className="panel" style={{ background: "var(--gold-wash)", marginTop: 8 }}>
@@ -190,7 +214,8 @@ export default function LigaDetail() {
 
         <div className="panel">
           <h3>Catatan pemain {isAdmin ? "" : "(lihat)"}</h3>
-          <p className="muted"><small>Gol tiap pemain, kebobolan tiap kiper (isi manual, kosongkan kalau kiper itu tidak main), dan kartu. Skorsing dihitung otomatis dari kartu.</small></p>
+          <p className="muted"><small>Gol tiap pemain, kebobolan tiap kiper (isi manual, kosongkan kalau kiper itu tidak main), dan kartu. {isAdmin ? "Tersimpan otomatis. " : ""}Skorsing dihitung otomatis dari kartu.</small></p>
+          {isAdmin && selisihGol && <div className="note warn" style={{ marginBottom: 10 }}>Total gol di tabel belum sama dengan skor ({teamNama(match.home)} {golTim(match.home)}, {teamNama(match.away)} {golTim(match.away)}).</div>}
           <div className="grid2">
             {[match.home, match.away].map((team) => {
               const list = rows.map((r, idx) => ({ r, idx })).filter(({ r }) => r.team === team);
@@ -204,13 +229,13 @@ export default function LigaDetail() {
                         <tr key={r.user_id}>
                           <td>{r.nama}{(skorsing[r.user_id] || 0) > 0 && <> <span className="pill bad">Skorsing {skorsing[r.user_id]} laga</span></>}</td>
                           <td>{r.posisi}</td>
-                          <td className="n">{isAdmin ? <input style={{ width: 52 }} inputMode="numeric" value={r.gol} onChange={(e) => updateRow(idx, { gol: e.target.value.replace(/\D/g, "") })} /> : r.gol}</td>
-                          <td className="n">{r.posisi !== "GK" ? "" : isAdmin ? <input style={{ width: 52 }} inputMode="numeric" placeholder="-" value={r.kebobolan} onChange={(e) => updateRow(idx, { kebobolan: e.target.value.replace(/\D/g, "") })} /> : (r.kebobolan || "-")}</td>
+                          <td className="n">{isAdmin ? <input style={{ width: 52 }} inputMode="numeric" value={r.gol} onChange={(e) => ubahBaris(idx, { gol: e.target.value.replace(/\D/g, "") })} /> : r.gol}</td>
+                          <td className="n">{r.posisi !== "GK" ? "" : isAdmin ? <input style={{ width: 52 }} inputMode="numeric" placeholder="-" value={r.kebobolan} onChange={(e) => ubahBaris(idx, { kebobolan: e.target.value.replace(/\D/g, "") })} /> : (r.kebobolan || "-")}</td>
                           <td>
                             {isAdmin ? (
                               <div className="row" style={{ gap: 3, flexWrap: "nowrap" }}>
                                 {KARTU_OPSI.map((o) => (
-                                  <button key={o.k} type="button" className="iconbtn" style={{ width: o.k === "kuning2" ? 34 : 28, height: 28 }} aria-pressed={r.kartu === o.k} aria-label={o.label} title={o.label} onClick={() => updateRow(idx, { kartu: o.k })}><KartuIkon k={o.k} /></button>
+                                  <button key={o.k} type="button" className="iconbtn" style={{ width: o.k === "kuning2" ? 34 : 28, height: 28 }} aria-pressed={r.kartu === o.k} aria-label={o.label} title={o.label} onClick={() => ubahBaris(idx, { kartu: o.k }, true)}><KartuIkon k={o.k} /></button>
                                 ))}
                               </div>
                             ) : <KartuIkon k={r.kartu} />}
@@ -224,7 +249,6 @@ export default function LigaDetail() {
               );
             })}
           </div>
-          {isAdmin && <button className="btn" style={{ marginTop: 10 }} disabled={busy} onClick={simpanPenilaian}>Simpan catatan pemain</button>}
         </div>
 
         {isAdmin && (

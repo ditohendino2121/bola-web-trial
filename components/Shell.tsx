@@ -6,6 +6,7 @@ import { supa } from "../lib/supa";
 import { BASECAMP } from "../lib/club";
 import Icon, { MENU } from "./Icon";
 import { Sponsors } from "./ui";
+import { InstallFooter } from "./InstallApp";
 
 function isActive(path: string, href: string) {
   if (href === "/") return path === "/";
@@ -106,6 +107,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           <div>
             <div className="brand-row"><img src="/logo-muba.jpg" alt="" /><b style={{ color: "var(--on-black)" }}>MUBA FC</b></div>
             <p style={{ fontSize: 12, lineHeight: 1.6, margin: 0 }}>{BASECAMP}</p>
+            <InstallFooter />
           </div>
           <div>
             <h4>Main</h4>

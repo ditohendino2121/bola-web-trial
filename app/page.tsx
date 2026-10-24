@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useDB, Loading, LoadError, StatusPill, Meter, DateBox, SponsorPanel } from "../components/ui";
 import { AuthPanel, AkadGate } from "../components/Account";
+import InstallApp from "../components/InstallApp";
 import { walletOf, totalKredit, dikunciRSVP, kuotaAktif, klasemen, teamNama } from "../lib/rules";
 import { signOut } from "../lib/data";
 import { BASECAMP } from "../lib/club";
@@ -59,6 +60,8 @@ export default function Home() {
         )}
         {!me && <div style={{ marginTop: 18 }}><a href="#akun"><button className="btn">Daftar untuk ikut main</button></a></div>}
       </div>
+
+      <InstallApp />
 
       <SponsorPanel />
 

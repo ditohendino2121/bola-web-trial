@@ -1,38 +1,30 @@
-# PANDUAN APK MUBA FC — Tampilan Baru GoPay x Hitam-Gold
+# Panduan aplikasi MUBA FC (PWA & APK)
 
-## Apa yang sudah jadi
-- **Redesign**: Emoji dihapus total, diganti ikon line tipis (GoPay style). Hero, card, sidebar, harga, jadwal dibikin bersih + banyak ruang putih. Warna tetap hitam (#0E0E10) + gold (#D4AF37).
-- **Menu baru tanpa emoji**: Beranda, Jadwal Main, Top-Up, Registrasi/Klasemen Liga, Saya, Akad, Kontak, Admin — pakai ikon SVG 18px.
-- **PWA siap**: `manifest.webmanifest`, `icon-192/512 + maskable + apple-touch-icon`, `sw.js` (Workbox), halaman `/offline`, halaman `/privasi` buat syarat APK.
-- **Build OK**: Next 14.2.5 + @ducanh2912/next-pwa, fallback document /offline, Supabase di NetworkOnly (tidak di-cache).
+Web `https://muba-fc.vercel.app` sudah berupa PWA: bisa dipasang di layar utama HP dan dibuka seperti aplikasi.
+Isinya selalu sama dengan web — tiap deploy ke Vercel, aplikasi ikut ter-update (tidak perlu pasang ulang).
 
-## Cara jadi APK via WA (Rp 0, tanpa Play Store)
-Tetap terhubung ke web yang sama (muba-fc.vercel.app). APK = browser tanpa address bar.
+## Yang sudah ada
+- `public/manifest.webmanifest` — nama, ikon (192, 512, maskable), warna hitam, shortcut Jadwal main / Jadwal liga / Klasemen / Top-up.
+- Service worker (`@ducanh2912/next-pwa`, dibuat otomatis saat build) — halaman `/offline` saat sinyal putus;
+  data Supabase tidak di-cache (selalu data terbaru); versi baru langsung aktif tiap deploy (`skipWaiting` + `clientsClaim`).
+- Tombol **Pasang aplikasi MUBA FC** di beranda: 1 klik di Android/Chrome, petunjuk di iPhone. Hilang otomatis kalau sudah terpasang.
 
-1. Pastikan web sudah deploy di Vercel (commit terbaru sudah include manifest + sw).
-2. Buka **PWABuilder.com** > masukkan `https://muba-fc.vercel.app` > Analyze.
-3. Pilih **Android Package** > Package ID `id.or.mubafc.app`, App name `MUBA FC`, Version 1.0.0.
-4. Pilih format **APK** (bukan AAB) > Generate > Download.
-5. Simpan `MUBA-FC-v1.apk` (~6-10 MB) > upload ke **Google Drive** > set Anyone with link.
-6. Share di Grup WA MUBA + QR di basecamp Tarasso Coffee. Teks WA:
-   > MUBA FC sekarang ada aplikasi! Install APK ini (Android): [link Drive] — login pakai akun yang sama. iPhone tetap pakai web. Jika muncul “File mungkin berbahaya”, klik Tetap install. Ada masalah chat Abu Faqih.
+## Cara pasang (pemain)
+- **Android (Chrome):** buka web → ketuk **Pasang** di beranda (atau menu titik tiga → *Instal aplikasi* / *Tambahkan ke layar utama*).
+- **iPhone (Safari):** buka web → tombol **Share** → **Add to Home Screen**.
+- Login pakai akun yang sama dengan web.
 
-### Install di HP pemain
-Klik link > Download > Buka file > Izinkan “Install dari sumber tak dikenal” > Install > ikon MUBA FC muncul. Login sama seperti web.
+## Kalau mau file APK (Android, gratis, tanpa Play Store)
+APK ini cuma "bungkus" web yang sama, jadi tetap ikut update otomatis.
 
-### Update
-Kalau ubah web di Vercel, APK ikut update otomatis (tidak perlu APK baru). Buat APK baru hanya kalau ganti ikon/nama/version atau update push.
+1. Buka **https://www.pwabuilder.com** → masukkan `https://muba-fc.vercel.app` → *Start*.
+2. Pilih **Package for stores → Android** → *Generate Package*.
+3. Isi: Package ID `id.mubafc.app`, App name `MUBA FC`, versi `1.0.0`. Pilih **Signing key: new** (simpan file key + password-nya baik-baik, dibutuhkan untuk update APK nanti).
+4. Download zip → ambil file `.apk` di dalamnya.
+5. Upload ke Google Drive (akses: siapa saja yang punya link) → bagikan link di grup WA.
 
-## Next step opsional
-- Pasang OneSignal (saran) untuk push jadwal/approve/kocok — gratis <10k user.
-- Kalau mau naik Play Store, file sama tapi pilih format AAB + daftar Play Console ($25) + isi Data Safety pakai halaman /privasi ini.
-- Lombakan screenshot hitam-gold untuk feature graphic Play Store (1024x500).
+Di HP pemain: buka link → download → izinkan *install dari sumber tidak dikenal* → Install.
+APK baru hanya perlu dibuat ulang kalau ganti nama/ikon aplikasi.
 
-## File yang diubah
-- `app/globals.css` (baru full GoPay clean)
-- `app/layout.tsx` (ikon SVG + head manifest/theme)
-- `app/page.tsx` (hero + pricing tanpa emoji)
-- `app/jadwal/page.tsx`, `app/topup/page.tsx`, `app/kontak/page.tsx`, `app/dashboard/page.tsx`, dll (strip emoji)
-- `public/manifest.webmanifest`, `public/icon-*`, `next.config.js`, `app/offline/page.tsx`, `app/privasi/page.tsx`
-
-Test instal: Chrome Android > buka web > menu titik 3 > Install app / Tambah ke layar utama.
+## Kalau mau masuk Play Store (opsional)
+Sama seperti di atas tapi pilih format **AAB**, daftar Google Play Console (biaya sekali US$25), isi Data Safety mengacu ke halaman `/privasi`.

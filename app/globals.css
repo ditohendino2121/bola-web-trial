@@ -452,3 +452,7 @@ table.table.compact td, table.table.compact th { padding: 6px 8px; }
 /* Baris sponsor kecil di atas match centre. */
 .mc-sponsors { justify-content: center; margin: 10px 0 2px; }
 .mc-sponsors img { height: 44px; }
+
+/* Ajakan pasang aplikasi (PWA) di beranda. */
+.install-app { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-color: var(--gold); }
+.install-app img { width: 44px; height: 44px; border-radius: var(--r-2); flex-shrink: 0; }

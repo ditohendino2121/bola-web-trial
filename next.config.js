@@ -7,6 +7,10 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   swcMinify: true,
   workboxOptions: {
     disableDevLogs: true,
+    // Versi baru langsung aktif tiap deploy (tidak menunggu semua tab ditutup), supaya pemain
+    // tidak tertahan di tampilan lama.
+    skipWaiting: true,
+    clientsClaim: true,
     runtimeCaching: [
       {
         urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,

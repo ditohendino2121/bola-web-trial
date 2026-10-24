@@ -32,6 +32,21 @@ export default function KlasemenPage() {
     .map((id) => ({ id, nama: db.users.find((x) => x.id === id)?.nama || id, tim: timOf(id), gol: golMap[id] || 0 }))
     .sort((a, b) => b.gol - a.gol);
 
+  // Kiper terbaik: dari kebobolan yang diinput per kiper. Laga dihitung kalau kebobolannya diisi
+  // (kosong = kiper itu tidak main). Urut rata-rata kebobolan terkecil, lalu clean sheet terbanyak.
+  const msIds = new Set(ms.map((m) => m.id));
+  const kiper = TEAM_CODES.flatMap((t) => (db.teams[t] || []).filter((m) => m.posisi === "GK").map((m) => ({ userId: m.userId, team: t })))
+    .map((g) => {
+      const main = playerStats.filter((p) => p.user_id === g.userId && msIds.has(p.match_id) && p.kebobolan !== null && p.kebobolan !== undefined);
+      const total = main.reduce((a, p) => a + (p.kebobolan || 0), 0);
+      return {
+        ...g, nama: db.users.find((u) => u.id === g.userId)?.nama || g.userId,
+        main: main.length, total, cs: main.filter((p) => p.kebobolan === 0).length,
+        rata: main.length ? total / main.length : null,
+      };
+    })
+    .sort((a, b) => (a.rata ?? Infinity) - (b.rata ?? Infinity) || b.cs - a.cs || b.main - a.main);
+
   const tabItems = [{ key: "overall", label: "Overall" }, ...editions.map((e) => ({ key: e.id, label: e.label }))];
 
   return (
@@ -97,6 +112,7 @@ export default function KlasemenPage() {
           </div>
         </div>
 
+        <div className="grid2">
         <div className="panel">
           <h3>Top skor</h3>
           {top.length === 0 ? <p className="muted">Belum ada pemain diassign ke tim.</p> : (
@@ -107,6 +123,29 @@ export default function KlasemenPage() {
               </table>
             </div>
           )}
+        </div>
+
+        <div className="panel">
+          <h3>Kiper terbaik</h3>
+          <p className="muted" style={{ margin: "2px 0 8px" }}><small>Urut rata-rata kebobolan per laga (terkecil), lalu clean sheet terbanyak.</small></p>
+          {kiper.length === 0 ? <p className="muted">Belum ada kiper di tim.</p> : (
+            <div className="tablewrap scroll">
+              <table className="table compact">
+                <thead><tr><th className="pos">#</th><th>Kiper</th><th className="n">Main</th><th className="n"><abbr title="Total kebobolan">Kbl</abbr></th><th className="n"><abbr title="Rata-rata kebobolan per laga">Rata</abbr></th><th className="n"><abbr title="Clean sheet (tidak kebobolan)">CS</abbr></th></tr></thead>
+                <tbody>{kiper.map((g, i) => (
+                  <tr key={g.userId} className={i === 0 && g.main > 0 ? "lead" : ""}>
+                    <td className="pos">{i + 1}</td>
+                    <td>{g.nama} <small className="muted">{teamNama(g.team)}</small></td>
+                    <td className="n">{g.main}</td>
+                    <td className="n">{g.main ? g.total : "-"}</td>
+                    <td className="n pts">{g.rata === null ? "-" : g.rata.toFixed(1)}</td>
+                    <td className="n">{g.main ? g.cs : "-"}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
         </div>
 
         <div className="panel">

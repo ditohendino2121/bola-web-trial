@@ -53,7 +53,7 @@ export default function LigaDetail() {
       return {
         user_id: mem.userId, team: mem.team, posisi: mem.posisi,
         nama: db.users.find((u) => u.id === mem.userId)?.nama || mem.userId,
-        gol: ex ? String(ex.gol ?? 0) : "0", kartu: (ex?.kartu as Kartu) ?? "tidak",
+        gol: ex ? String(ex.gol ?? 0) : "0", og: ex ? String(ex.gol_bunuh_diri ?? 0) : "0", kartu: (ex?.kartu as Kartu) ?? "tidak",
         kebobolan: ex?.kebobolan === null || ex?.kebobolan === undefined ? "" : String(ex.kebobolan),
       };
     }));
@@ -96,13 +96,6 @@ export default function LigaDetail() {
     if (e) throw new Error(e.message);
     patchMatchLokal(patch);
   };
-  const ubahSkor = (sisiTim: "h" | "a", v: string) => {
-    const nilai = v.replace(/\D/g, "");
-    const nextSh = sisiTim === "h" ? nilai : sh;
-    const nextSa = sisiTim === "a" ? nilai : sa;
-    if (sisiTim === "h") setSh(nilai); else setSa(nilai);
-    antre("skor", () => simpanSkor(nextSh, nextSa));
-  };
 
   const simpanPenalti = (tim: string | null) => antre("penalti", async () => {
     const { error: e } = await supa().from("league_matches").update({ penalti_pemenang: tim }).eq("id", matchId);
@@ -114,7 +107,7 @@ export default function LigaDetail() {
   const simpanBaris = async (r: any) => {
     const { data, error: e } = await supa().from("league_player_stats").upsert({
       match_id: matchId, user_id: r.user_id, team: r.team, posisi: r.posisi,
-      gol: Number(r.gol) || 0, kartu: r.kartu,
+      gol: Number(r.gol) || 0, gol_bunuh_diri: Number(r.og) || 0, kartu: r.kartu,
       kebobolan: r.posisi === "GK" && r.kebobolan !== "" ? Number(r.kebobolan) : null,
       assist: 0, aksi_kunci: 0, shot_on_target: 0, blunder: 0, nilai_oto: null, override: null, catatan_override: "",
     }, { onConflict: "match_id,user_id" }).select().single();
@@ -127,10 +120,11 @@ export default function LigaDetail() {
     const nextRows = rows.map((r, i) => (i === idx ? baru : r));
     setRows(nextRows);
     antre(`row-${baru.user_id}`, () => simpanBaris(baru), segera);
-    // Skor ikut otomatis = jumlah gol pemain tiap tim (masih bisa dikoreksi manual di kolom skor).
-    if ("gol" in patch) {
-      const total = (team: string) => String(nextRows.filter((r) => r.team === team).reduce((a, c) => a + (Number(c.gol) || 0), 0));
-      const nextSh = total(match.home); const nextSa = total(match.away);
+    // Skor otomatis = gol pemain tim sendiri + gol bunuh diri pemain lawan.
+    if ("gol" in patch || "og" in patch) {
+      const sum = (team: string, f: "gol" | "og") => nextRows.filter((r) => r.team === team).reduce((a, c) => a + (Number(c[f]) || 0), 0);
+      const nextSh = String(sum(match.home, "gol") + sum(match.away, "og"));
+      const nextSa = String(sum(match.away, "gol") + sum(match.home, "og"));
       setSh(nextSh); setSa(nextSa);
       antre("skor", () => simpanSkor(nextSh, nextSa));
     }
@@ -153,14 +147,14 @@ export default function LigaDetail() {
     setBusy(false);
   };
 
-  const golTim = (team: string) => rows.filter((r) => r.team === team).reduce((a, c) => a + (Number(c.gol) || 0), 0);
-  const selisihGol = skorLengkap && (golTim(match.home) !== Number(sh) || golTim(match.away) !== Number(sa));
 
   // Pencetak gol & kartu per tim (dari isian lokal, jadi langsung muncul).
   const statLines = (team: string) => {
     const tim = rows.filter((r) => r.team === team);
+    const lawan = rows.filter((r) => r.team !== team);
     return [
       ...tim.filter((r) => Number(r.gol) > 0).map((r) => <div key={`${r.user_id}-g`} className="statline"><Icon name="ball" /><span>{r.nama} - {Number(r.gol)}</span></div>),
+      ...lawan.filter((r) => Number(r.og) > 0).map((r) => <div key={`${r.user_id}-og`} className="statline"><Icon name="ball" /><span>{r.nama} (bunuh diri){Number(r.og) > 1 ? ` - ${Number(r.og)}` : ""}</span></div>),
       ...tim.filter((r) => r.kartu !== "tidak").map((r) => <div key={`${r.user_id}-k`} className="statline"><KartuIkon k={r.kartu} /><span>{r.nama}</span></div>),
     ];
   };
@@ -200,12 +194,8 @@ export default function LigaDetail() {
 
         {isAdmin && (
           <div className="panel">
-            <h3>Skor</h3>
-            <p className="muted"><small>Otomatis mengikuti jumlah gol pemain di tabel bawah. Boleh dikoreksi manual (misal gol bunuh diri) — tersimpan otomatis.</small></p>
-            <div className="grid2">
-              <label className="field"><span>Skor {teamNama(match.home)}</span><input inputMode="numeric" value={sh} placeholder="0" disabled={busy} onChange={(e) => ubahSkor("h", e.target.value)} /></label>
-              <label className="field"><span>Skor {teamNama(match.away)}</span><input inputMode="numeric" value={sa} placeholder="0" disabled={busy} onChange={(e) => ubahSkor("a", e.target.value)} /></label>
-            </div>
+            <h3>Skor: {teamNama(match.home)} {sh || 0} - {sa || 0} {teamNama(match.away)}</h3>
+            <p className="muted"><small>Dihitung otomatis dari tabel di bawah: gol pemain tim sendiri + gol bunuh diri pemain lawan.</small></p>
             {imbang && (
               <div className="panel" style={{ background: "var(--gold-wash)", marginTop: 8 }}>
                 <h4>Skor imbang — siapa menang adu penalti?</h4>
@@ -223,7 +213,6 @@ export default function LigaDetail() {
         <div className="panel">
           <h3>Catatan pemain {isAdmin ? "" : "(lihat)"}</h3>
           <p className="muted"><small>Gol tiap pemain, kebobolan tiap kiper (isi manual, kosongkan kalau kiper itu tidak main), dan kartu. {isAdmin ? "Tersimpan otomatis. " : ""}Skorsing dihitung otomatis dari kartu.</small></p>
-          {isAdmin && selisihGol && <div className="note warn" style={{ marginBottom: 10 }}>Total gol di tabel belum sama dengan skor ({teamNama(match.home)} {golTim(match.home)}, {teamNama(match.away)} {golTim(match.away)}).</div>}
           <div className="grid2">
             {[match.home, match.away].map((team) => {
               const list = rows.map((r, idx) => ({ r, idx })).filter(({ r }) => r.team === team);
@@ -231,13 +220,14 @@ export default function LigaDetail() {
                 <div key={team}>
                   <h4 className="clubcell" style={{ marginBottom: 6 }}><Crest team={team} size="sm" /> {teamNama(team)}</h4>
                   <div className="tablewrap"><table className="table compact">
-                    <thead><tr><th>Pemain</th><th>Pos</th><th className="n">Gol</th><th className="n"><abbr title="Gol kebobolan (kiper)">Kbl</abbr></th><th>Kartu</th></tr></thead>
+                    <thead><tr><th>Pemain</th><th>Pos</th><th className="n">Gol</th><th className="n"><abbr title="Gol bunuh diri (masuk ke skor lawan)">BD</abbr></th><th className="n"><abbr title="Gol kebobolan (kiper)">Kbl</abbr></th><th>Kartu</th></tr></thead>
                     <tbody>
                       {list.map(({ r, idx }) => (
                         <tr key={r.user_id}>
                           <td>{r.nama}{(skorsing[r.user_id] || 0) > 0 && <> <span className="pill bad">Skorsing {skorsing[r.user_id]} laga</span></>}</td>
                           <td>{r.posisi}</td>
                           <td className="n">{isAdmin ? <input style={{ width: 52 }} inputMode="numeric" value={r.gol} onChange={(e) => ubahBaris(idx, { gol: e.target.value.replace(/\D/g, "") })} /> : r.gol}</td>
+                          <td className="n">{isAdmin ? <input style={{ width: 44 }} inputMode="numeric" value={r.og} onChange={(e) => ubahBaris(idx, { og: e.target.value.replace(/\D/g, "") })} /> : (Number(r.og) > 0 ? r.og : "")}</td>
                           <td className="n">{r.posisi !== "GK" ? "" : isAdmin ? <input style={{ width: 52 }} inputMode="numeric" placeholder="-" value={r.kebobolan} onChange={(e) => ubahBaris(idx, { kebobolan: e.target.value.replace(/\D/g, "") })} /> : (r.kebobolan || "-")}</td>
                           <td>
                             {isAdmin ? (
@@ -250,7 +240,7 @@ export default function LigaDetail() {
                           </td>
                         </tr>
                       ))}
-                      {list.length === 0 && <tr><td colSpan={5}><p className="muted" style={{ margin: "8px 0" }}>Belum ada pemain di tim ini.</p></td></tr>}
+                      {list.length === 0 && <tr><td colSpan={6}><p className="muted" style={{ margin: "8px 0" }}>Belum ada pemain di tim ini.</p></td></tr>}
                     </tbody>
                   </table></div>
                 </div>

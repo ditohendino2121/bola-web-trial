@@ -24,7 +24,7 @@ export interface Goal { scorerId: string; }
 export interface Match { id: string; home: string; away: string; sh: number | null; sa: number | null; goals: Goal[]; tanggal?: string; jam?: string; lokasi?: string; edition_id?: string | null; penalti_pemenang?: string | null; }
 export interface TeamMember { userId: string; posisi: PosisiMain; }
 export interface LeagueEdition { id: string; label: string; tanggal: string; created_at: string; }
-export interface PlayerStat { id: string; match_id: string; user_id: string; team: string; posisi: string; gol: number; assist: number; aksi_kunci: number; shot_on_target: number; kartu: string; blunder: number; nilai_oto: number | null; override: number | null; catatan_override?: string; kebobolan?: number | null; }
+export interface PlayerStat { id: string; match_id: string; user_id: string; team: string; posisi: string; gol: number; assist: number; aksi_kunci: number; shot_on_target: number; kartu: string; blunder: number; nilai_oto: number | null; override: number | null; catatan_override?: string; kebobolan?: number | null; gol_bunuh_diri?: number; }
 export interface Expense { id: string; tanggal: string; jenis: string; keterangan: string; nominal: number; }
 export interface ManualIncome { id: string; tanggal: string; sumber: string; keterangan: string; nominal: number; }
 
@@ -71,7 +71,7 @@ export const mapMatch = (m: any): Match => ({
   goals: m.goals || [], tanggal: m.tanggal || "", jam: m.jam || "", lokasi: m.lokasi || "", edition_id: m.edition_id || null, penalti_pemenang: m.penalti_pemenang || null,
 });
 export const mapPlayerStat = (p: any): PlayerStat => ({
-  id: p.id, match_id: p.match_id, user_id: p.user_id, team: p.team, posisi: p.posisi, gol: p.gol, assist: p.assist, aksi_kunci: p.aksi_kunci, shot_on_target: p.shot_on_target, kartu: p.kartu, blunder: p.blunder, nilai_oto: p.nilai_oto, override: p.override, catatan_override: p.catatan_override, kebobolan: p.kebobolan ?? null,
+  id: p.id, match_id: p.match_id, user_id: p.user_id, team: p.team, posisi: p.posisi, gol: p.gol, assist: p.assist, aksi_kunci: p.aksi_kunci, shot_on_target: p.shot_on_target, kartu: p.kartu, blunder: p.blunder, nilai_oto: p.nilai_oto, override: p.override, catatan_override: p.catatan_override, kebobolan: p.kebobolan ?? null, gol_bunuh_diri: p.gol_bunuh_diri ?? 0,
 });
 
 /** Ambil ulang 1 laga + catatan pemainnya saja (ringan), lalu gabungkan ke DB yang sudah dimuat. */

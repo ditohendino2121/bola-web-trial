@@ -56,6 +56,9 @@ export default function LayarSkor() {
         <div className="layar-team">{teamNama(team)}</div>
         <div className="layar-scorers">
           {pencetak.map((m) => <div key={m.userId}><Icon name="ball" /> {namaOf(m.userId)} {golOf(m.userId) > 1 ? `(${golOf(m.userId)})` : ""}</div>)}
+          {stats.filter((p) => p.team !== team && (p.gol_bunuh_diri || 0) > 0).map((p) => (
+            <div key={`og-${p.user_id}`}><Icon name="ball" /> {namaOf(p.user_id)} (bunuh diri){(p.gol_bunuh_diri || 0) > 1 ? ` (${p.gol_bunuh_diri})` : ""}</div>
+          ))}
         </div>
         <div className="layar-lineup">
           {lineup.map((m) => (

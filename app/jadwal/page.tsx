@@ -67,7 +67,7 @@ export default function Jadwal() {
             })}
           </div>
         )}
-        <p className="muted"><small>Kuota 28: GK 4, Belakang/Tengah/Depan masing-masing 8. Untuk jadwal liga, buka menu Liga.</small></p>
+        <p className="muted"><small>Kuota 28: GK 4, Belakang/Tengah/Depan masing-masing 8. Untuk jadwal liga, buka menu Jadwal liga.</small></p>
         {terkunci && <div className="note err">{nLangsung > 0 ? `Kamu ada ${nLangsung}x bayar-di-tempat yang belum dikonfirmasi lunas admin. Selesaikan dulu untuk buka list berikutnya.` : "Kamu punya tunggakan. Lunasi ke admin dulu untuk buka list berikutnya."}</div>}
         {jadwalBiasa.length === 0 && <Empty title="Belum ada jadwal. Admin buat di Kelola jadwal." />}
         {upcoming.length === 0 && jadwalBiasa.length > 0 && <Empty title="Semua jadwal sudah lewat, menunggu jadwal baru dari admin." />}

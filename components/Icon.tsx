@@ -26,6 +26,7 @@ export default function Icon({ name, ...rest }: { name: IconName } & React.SVGPr
 export const MENU: { href: string; label: string; icon: IconName }[] = [
   { href: "/", label: "Beranda", icon: "home" },
   { href: "/jadwal", label: "Jadwal main", icon: "cal" },
+  { href: "/jadwal-liga", label: "Jadwal liga", icon: "cal" },
   { href: "/topup", label: "Top-up", icon: "wallet" },
   { href: "/liga", label: "Liga", icon: "clip" },
   { href: "/klasemen", label: "Klasemen", icon: "chart" },

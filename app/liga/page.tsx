@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Crest, Empty } from "../../components/ui";
 import { supa } from "../../lib/supa";
 import { updateRow } from "../../lib/data";
-import { teamNama, walletOf, TEAM_CODES, lewatHariHLiga, urutkanPosisi, hitungSkorsing } from "../../lib/rules";
+import { teamNama, walletOf, TEAM_CODES, urutkanPosisi, hitungSkorsing } from "../../lib/rules";
 
 const POSISI = ["GK", "Belakang", "Tengah", "Depan"] as const;
 
@@ -103,26 +103,13 @@ export default function LigaPage() {
   });
   const hapusMatch = (matchId: string) => { if (!confirm("Hapus pertandingan ini?")) return; run(async () => { const { error: e } = await supa().from("league_matches").delete().eq("id", matchId); if (e) throw new Error(e.message); }); };
 
-  const rsvpEdisi = (scheduleId: string, posisi: string, metode: "deposit" | "langsung") => run(async () => {
-    const { data, error: e } = await supa().rpc("rpc_rsvp", { p_schedule: scheduleId, p_posisi: posisi, p_metode: metode });
-    if (e) throw new Error(e.message);
-    if (!(data as any)?.ok) throw new Error((data as any)?.msg || "Gagal konfirmasi.");
-  });
-  // Liga boleh batal s.d. H-1 (lihat supabase/migration_liga_v2.sql untuk rpc_cancel).
-  const batalEdisi = (rsvpId: string) => run(async () => {
-    const { data, error: e } = await supa().rpc("rpc_cancel", { p_schedule: rsvpId });
-    if (e) throw new Error(e.message);
-    if (!(data as any)?.ok) throw new Error((data as any)?.msg || "Gagal batal.");
-  });
-
   const skorsing = hitungSkorsing(db.matches, db.playerStats, teams);
-  const myPos = (() => { for (const t of TEAM_CODES) { const mem = (teams[t] || []).find((x) => x.userId === me?.id); if (mem) return mem.posisi; } return "Depan"; })();
 
   return (
     <div>
       <PageHead
         title="Liga"
-        desc="KIM x DnA Health League — tim, edisi, dan konfirmasi bayar."
+        desc="KIM x DnA Health League — tim dan edisi. Konfirmasi kehadiran ada di Jadwal liga."
         actions={<>
           {isAdmin && <button className="btn dark" disabled={busy || locked} onClick={toggleLock}>{locked ? "Skuad terkunci" : "Kunci skuad"}</button>}
           <Link href="/klasemen"><button className="btn ghost" style={{ borderColor: "var(--black-line)", color: "var(--on-black)" }}>Lihat klasemen</button></Link>
@@ -201,32 +188,18 @@ export default function LigaPage() {
             const s = db.schedules.find((x) => x.is_liga && x.edition_id === ed.id);
             const list = s ? db.rsvps.filter((r) => r.scheduleId === s.id && r.status !== "cancelled") : [];
             const mine = s ? list.find((r) => r.userId === me?.id) : null;
-            const isSkuad = TEAM_CODES.some((t) => (teams[t] || []).some((m) => m.userId === me?.id));
             const edMatches = db.matches.filter((m) => m.edition_id === ed.id);
-            const sudahHariH = s ? lewatHariHLiga(s) : false;
             return (
               <div key={ed.id} className="panel" style={{ margin: "10px 0" }}>
                 <div className="row" style={{ justifyContent: "space-between" }}>
                   <div><b>{ed.label}</b> <span className="pill info">{ed.tanggal}</span> {s && <span className={`pill ${s.status === "buka" ? "ok" : "bad"}`}>{s.status}</span>}</div>
                   {isAdmin && <button className="btn danger sm" onClick={() => hapusEdisi(ed.id)}>Hapus edisi</button>}
                 </div>
-                {!s ? <p className="muted"><small>Jadwal bayar belum ada.</small></p> : (
-                  <>
-                    <p className="muted" style={{ marginTop: 6 }}><small>{list.length}/40 konfirmasi</small></p>
-                    {!me ? <p className="muted"><small>Login dulu.</small></p> : !isSkuad ? <div className="note warn">Hanya yang sudah diassign ke tim yang bisa konfirmasi edisi ini.</div> : !mine ? (
-                      <div className="row">
-                        <button className="btn" disabled={busy} onClick={() => rsvpEdisi(s.id, myPos, "deposit")}>{myPos} — potong 1 kredit</button>
-                        <button className="btn ghost" disabled={busy} onClick={() => rsvpEdisi(s.id, myPos, "langsung")}>Bayar cash (Rp{myPos === "GK" ? "15.000" : "25.000"})</button>
-                      </div>
-                    ) : sudahHariH ? (
-                      <span className={`pill ${mine.status === "confirmed_lunas" ? "ok" : "info"}`}>{mine.status === "confirmed_lunas" ? "Lunas" : "Di tempat"} ({mine.posisi})</span>
-                    ) : (
-                      <div className="row" style={{ alignItems: "center" }}>
-                        <span className={`pill ${mine.status === "confirmed_lunas" ? "ok" : "info"}`}>{mine.status === "confirmed_lunas" ? "Lunas" : "Di tempat"} ({mine.posisi})</span>
-                        <button className="btn danger sm" disabled={busy} onClick={() => batalEdisi(s.id)}>Batal, s.d. H-1</button>
-                      </div>
-                    )}
-                  </>
+                {!s ? <p className="muted"><small>Jadwal konfirmasi belum ada.</small></p> : (
+                  <div className="row" style={{ marginTop: 6, justifyContent: "space-between" }}>
+                    <small className="muted">{list.length} sudah konfirmasi{mine ? " · kamu sudah konfirmasi" : ""}</small>
+                    <Link href="/jadwal-liga" className="linkbtn">Konfirmasi kehadiran di Jadwal liga</Link>
+                  </div>
                 )}
 
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line-2)" }}>

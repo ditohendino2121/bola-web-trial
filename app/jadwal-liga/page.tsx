@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Empty, DateBox, Crest, Meter, Tabs, SponsorPanel } from "../../components/ui";
 import { supa } from "../../lib/supa";
-import { teamNama, TEAM_CODES, urutkanPosisi, lewatHariHLiga, hitungSkorsing, walletOf, totalKredit } from "../../lib/rules";
+import { teamNama, TEAM_CODES, urutkanPosisi, lewatHariHLiga, hitungSkorsing, walletOf, totalKredit, statusLaga } from "../../lib/rules";
 import { tanggalID } from "../../lib/util";
 
 function todayLocalISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
@@ -84,7 +84,11 @@ export default function JadwalLiga() {
                   {laga.map((m) => (
                     <Link key={m.id} href={`/liga/${m.id}`} className="fx">
                       <span className="fx-team home">{teamNama(m.home)} <Crest team={m.home} size="sm" /></span>
-                      <span className={m.sh !== null && m.sa !== null ? "scorebox" : "scorebox time"}>{m.sh !== null && m.sa !== null ? `${m.sh} - ${m.sa}` : "vs"}</span>
+                      <span className="stack" style={{ gap: 2, alignItems: "center" }}>
+                        <span className={m.sh !== null && m.sa !== null ? "scorebox" : "scorebox time"}>{m.sh !== null && m.sa !== null ? `${m.sh} - ${m.sa}` : "vs"}</span>
+                        {statusLaga(m) === "live" && <span className="pill bad" style={{ fontSize: 10, padding: "1px 6px" }}>LIVE</span>}
+                        {statusLaga(m) === "selesai" && <small className="muted" style={{ fontSize: 10 }}>Selesai</small>}
+                      </span>
                       <span className="fx-team away"><Crest team={m.away} size="sm" /> {teamNama(m.away)}</span>
                     </Link>
                   ))}

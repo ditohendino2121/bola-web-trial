@@ -56,9 +56,16 @@ export function lewatHariHLiga(s: Schedule): boolean {
   return todayISO >= s.tanggal;
 }
 
-/** Pemenang laga: skor lebih besar, atau pemenang adu penalti kalau skor imbang. null = belum selesai. */
+/** Status laga: belum mulai (belum ada skor), berlangsung (ada skor, belum ditutup admin), selesai. */
+export type StatusLaga = "belum" | "live" | "selesai";
+export function statusLaga(m: Match): StatusLaga {
+  if (m.selesai) return "selesai";
+  return m.sh !== null || m.sa !== null ? "live" : "belum";
+}
+
+/** Pemenang laga yang SUDAH SELESAI: skor lebih besar, atau pemenang adu penalti kalau imbang. */
 export function pemenangLaga(m: Match): { menang: string; kalah: string; penalti: boolean } | null {
-  if (m.sh === null || m.sa === null) return null;
+  if (!m.selesai || m.sh === null || m.sa === null) return null;
   if (m.sh > m.sa) return { menang: m.home, kalah: m.away, penalti: false };
   if (m.sa > m.sh) return { menang: m.away, kalah: m.home, penalti: false };
   if (m.penalti_pemenang === m.home) return { menang: m.home, kalah: m.away, penalti: true };
@@ -85,7 +92,7 @@ export function klasemen(matches: Match[], playerStats: PlayerStat[] = []) {
     if (hasil.penalti) { t[hasil.menang].WP++; t[hasil.menang].P += 2; t[hasil.kalah].LP++; t[hasil.kalah].P += 1; }
     else { t[hasil.menang].W++; t[hasil.menang].P += 3; t[hasil.kalah].L++; }
   });
-  const ids = new Set(matches.map((m) => m.id));
+  const ids = new Set(matches.filter((m) => m.selesai).map((m) => m.id));
   playerStats.forEach((ps) => {
     if (!ids.has(ps.match_id) || !t[ps.team]) return;
     t[ps.team].FP += FAIRPLAY_POIN[ps.kartu] || 0;
@@ -117,7 +124,7 @@ export function hitungSkorsing(matches: Match[], playerStats: PlayerStat[], team
   for (const team of TEAM_CODES) {
     const squad = new Set((teams[team] || []).map((m) => m.userId));
     const played = matches
-      .filter((m) => (m.home === team || m.away === team) && m.sh !== null && m.sa !== null)
+      .filter((m) => (m.home === team || m.away === team) && m.selesai)
       .slice()
       .sort((a, b) => `${a.tanggal || ""}${a.jam || ""}`.localeCompare(`${b.tanggal || ""}${b.jam || ""}`));
     for (const m of played) {

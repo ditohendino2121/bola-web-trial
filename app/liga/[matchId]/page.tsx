@@ -6,7 +6,7 @@ import { useDB, Loading, LoadError, Crest, Empty, CardTag, Sponsors } from "../.
 import Icon from "../../../components/Icon";
 import { supa } from "../../../lib/supa";
 import { mapPlayerStat } from "../../../lib/data";
-import { teamNama, urutkanPosisi, hitungSkorsing } from "../../../lib/rules";
+import { teamNama, urutkanPosisi, hitungSkorsing, statusLaga } from "../../../lib/rules";
 
 type Kartu = "tidak" | "kuning" | "kuning2" | "merah";
 const KARTU_OPSI: { k: Kartu; label: string }[] = [
@@ -70,6 +70,8 @@ export default function LigaDetail() {
 
   // Tampilan atas pakai nilai yang sedang diketik (langsung berubah, tidak menunggu database).
   const skorLengkap = sh !== "" && sa !== "";
+  const statusMain = statusLaga({ ...match, sh: sh === "" ? null : Number(sh), sa: sa === "" ? null : Number(sa) });
+  const bisaEdit = isAdmin && !match.selesai; // laga selesai terkunci sampai admin "Buka lagi"
   const imbang = skorLengkap && sh === sa;
   const skorsing = hitungSkorsing(db.matches, db.playerStats, db.teams);
 
@@ -132,6 +134,38 @@ export default function LigaDetail() {
   };
 
   // Reset total: skor, adu penalti, dan semua catatan pemain laga ini kembali kosong.
+  // Tutup laga: skor dikunci (kosong -> 0), baru masuk klasemen & statistik.
+  const selesaikan = async () => {
+    if (!isAdmin) return;
+    const fSh = sh === "" ? 0 : Number(sh), fSa = sa === "" ? 0 : Number(sa);
+    if (fSh === fSa && !match.penalti_pemenang) return alert("Skor imbang. Pilih dulu pemenang adu penalti, baru pertandingan bisa diselesaikan.");
+    const pk = fSh === fSa ? ` (adu penalti: ${teamNama(match.penalti_pemenang!)} menang)` : "";
+    if (!confirm(`Selesaikan pertandingan dengan skor akhir ${teamNama(match.home)} ${fSh} - ${fSa} ${teamNama(match.away)}${pk}?
+Setelah ini skor terkunci dan masuk klasemen.`)) return;
+    Object.values(timers.current).forEach(clearTimeout); timers.current = {};
+    setBusy(true);
+    try {
+      await Promise.all(rows.map((r) => simpanBaris(r))); // pastikan semua catatan pemain tersimpan
+      const patch = { sh: fSh, sa: fSa, selesai: true };
+      const { error: e } = await supa().from("league_matches").update(patch).eq("id", matchId);
+      if (e) throw new Error(e.message);
+      setSh(String(fSh)); setSa(String(fSa));
+      patchMatchLokal(patch);
+      setStatus("tersimpan");
+    } catch (e: any) { alert(e.message); }
+    setBusy(false);
+  };
+  const bukaLagi = async () => {
+    if (!isAdmin || !confirm("Buka lagi pertandingan ini untuk koreksi? Hasilnya keluar dari klasemen sampai diselesaikan lagi.")) return;
+    setBusy(true);
+    try {
+      const { error: e } = await supa().from("league_matches").update({ selesai: false }).eq("id", matchId);
+      if (e) throw new Error(e.message);
+      patchMatchLokal({ selesai: false });
+    } catch (e: any) { alert(e.message); }
+    setBusy(false);
+  };
+
   const resetPertandingan = async () => {
     if (!isAdmin || !confirm("Reset pertandingan ini? Skor, adu penalti, gol, kebobolan, dan kartu semuanya dihapus. Tidak bisa dibatalkan.")) return;
     Object.values(timers.current).forEach(clearTimeout); timers.current = {};
@@ -139,7 +173,7 @@ export default function LigaDetail() {
     try {
       const { error: e1 } = await supa().from("league_player_stats").delete().eq("match_id", matchId);
       if (e1) throw new Error(e1.message);
-      const { error: e2 } = await supa().from("league_matches").update({ sh: null, sa: null, penalti_pemenang: null }).eq("id", matchId);
+      const { error: e2 } = await supa().from("league_matches").update({ sh: null, sa: null, penalti_pemenang: null, selesai: false }).eq("id", matchId);
       if (e2) throw new Error(e2.message);
       initFor.current = null;
       await reload();
@@ -181,6 +215,8 @@ export default function LigaDetail() {
           <div className="mc">
             {sisi(match.home)}
             <div className="mc-score">
+              {statusMain === "live" && <span className="pill bad">LIVE</span>}
+              {statusMain === "selesai" && <span className="pill neutral">Selesai</span>}
               <div className="mc-num">{skorLengkap ? `${sh} - ${sa}` : "vs"}</div>
               {imbang && match.penalti_pemenang && <small>Adu penalti: {teamNama(match.penalti_pemenang)} menang</small>}
               {imbang && !match.penalti_pemenang && <small>Imbang, adu penalti belum diisi</small>}
@@ -196,7 +232,13 @@ export default function LigaDetail() {
 
         {isAdmin && (
           <div className="panel">
-            <h3>Skor: {teamNama(match.home)} {sh || 0} - {sa || 0} {teamNama(match.away)}</h3>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <h3>Skor: {teamNama(match.home)} {sh || 0} - {sa || 0} {teamNama(match.away)}</h3>
+              {match.selesai
+                ? <button className="btn ghost sm" disabled={busy} onClick={bukaLagi}>Buka lagi untuk koreksi</button>
+                : <button className="btn dark" disabled={busy} onClick={selesaikan}>Pertandingan selesai</button>}
+            </div>
+            {match.selesai && <div className="note ok" style={{ margin: "8px 0" }}>Pertandingan selesai — skor dan catatan pemain terkunci, sudah masuk klasemen.</div>}
             <p className="muted"><small>Dihitung otomatis dari tabel di bawah: gol pemain tim sendiri + gol bunuh diri pemain lawan.</small></p>
             {imbang && (
               <div className="panel" style={{ background: "var(--gold-wash)", marginTop: 8 }}>
@@ -204,7 +246,7 @@ export default function LigaDetail() {
                 <p className="muted"><small>Tidak ada hasil seri. Menang adu penalti 2 poin, kalah adu penalti 1 poin. Jumlah penendang bebas, ditentukan admin.</small></p>
                 <div className="row">
                   {[match.home, match.away].map((t) => (
-                    <button key={t} className={`btn sm ${match.penalti_pemenang === t ? "" : "ghost"}`} aria-pressed={match.penalti_pemenang === t} disabled={busy} onClick={() => simpanPenalti(t)}>{teamNama(t)}</button>
+                    <button key={t} className={`btn sm ${match.penalti_pemenang === t ? "" : "ghost"}`} aria-pressed={match.penalti_pemenang === t} disabled={busy || !!match.selesai} onClick={() => simpanPenalti(t)}>{teamNama(t)}</button>
                   ))}
                 </div>
               </div>
@@ -228,11 +270,11 @@ export default function LigaDetail() {
                         <tr key={r.user_id}>
                           <td>{r.nama}{(skorsing[r.user_id] || 0) > 0 && <> <span className="pill bad">Skorsing {skorsing[r.user_id]} laga</span></>}</td>
                           <td>{r.posisi}</td>
-                          <td className="n">{isAdmin ? <input style={{ width: 52 }} inputMode="numeric" value={r.gol} onChange={(e) => ubahBaris(idx, { gol: e.target.value.replace(/\D/g, "") })} /> : r.gol}</td>
-                          <td className="n">{isAdmin ? <input style={{ width: 44 }} inputMode="numeric" value={r.og} onChange={(e) => ubahBaris(idx, { og: e.target.value.replace(/\D/g, "") })} /> : (Number(r.og) > 0 ? r.og : "")}</td>
-                          <td className="n">{r.posisi !== "GK" ? "" : isAdmin ? <input style={{ width: 52 }} placeholder="A" title="Angka kebobolan, atau A / kosong kalau kiper tidak main" value={r.kebobolan} onChange={(e) => { const v = e.target.value.trim(); ubahBaris(idx, { kebobolan: /^[aA]$/.test(v) ? "A" : v.replace(/\D/g, "") }); }} /> : (/^\d+$/.test(r.kebobolan) ? r.kebobolan : "A")}</td>
+                          <td className="n">{bisaEdit ? <input style={{ width: 52 }} inputMode="numeric" value={r.gol} onChange={(e) => ubahBaris(idx, { gol: e.target.value.replace(/\D/g, "") })} /> : r.gol}</td>
+                          <td className="n">{bisaEdit ? <input style={{ width: 44 }} inputMode="numeric" value={r.og} onChange={(e) => ubahBaris(idx, { og: e.target.value.replace(/\D/g, "") })} /> : (Number(r.og) > 0 ? r.og : "")}</td>
+                          <td className="n">{r.posisi !== "GK" ? "" : bisaEdit ? <input style={{ width: 52 }} placeholder="A" title="Angka kebobolan, atau A / kosong kalau kiper tidak main" value={r.kebobolan} onChange={(e) => { const v = e.target.value.trim(); ubahBaris(idx, { kebobolan: /^[aA]$/.test(v) ? "A" : v.replace(/\D/g, "") }); }} /> : (/^\d+$/.test(r.kebobolan) ? r.kebobolan : "A")}</td>
                           <td>
-                            {isAdmin ? (
+                            {bisaEdit ? (
                               <div className="row" style={{ gap: 3, flexWrap: "nowrap" }}>
                                 {KARTU_OPSI.map((o) => (
                                   <button key={o.k} type="button" className="iconbtn" style={{ width: o.k === "kuning2" ? 34 : 28, height: 28 }} aria-pressed={r.kartu === o.k} aria-label={o.label} title={o.label} onClick={() => ubahBaris(idx, { kartu: o.k }, true)}><KartuIkon k={o.k} /></button>

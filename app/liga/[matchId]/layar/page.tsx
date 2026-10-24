@@ -5,7 +5,7 @@ import { useDB, Crest, Sponsors } from "../../../../components/ui";
 import Icon from "../../../../components/Icon";
 import { supa } from "../../../../lib/supa";
 import { loadMatch, mergeMatch } from "../../../../lib/data";
-import { teamNama, urutkanPosisi } from "../../../../lib/rules";
+import { teamNama, urutkanPosisi, statusLaga } from "../../../../lib/rules";
 
 // Tampilan layar besar (proyektor/TV): skor, line up, pencetak gol. Tanpa menu.
 // Live lewat Supabase Realtime (migration_liga_v5.sql); cadangan cek ringan tiap 5 detik.
@@ -72,7 +72,7 @@ export default function LayarSkor() {
   return (
     <div className="layar">
       <div className="layar-top">
-        <span>{edisi?.label || "KIM x DnA Health League"} {live && <span className="layar-live">LIVE</span>}</span>
+        <span>{edisi?.label || "KIM x DnA Health League"} {statusLaga(match) === "live" && <span className="layar-live">LIVE</span>}{match.selesai && <span className="layar-live layar-ft">SELESAI</span>}</span>
         <button className="layar-fs" onClick={() => document.documentElement.requestFullscreen?.()}>Layar penuh</button>
       </div>
       <div className="layar-main">

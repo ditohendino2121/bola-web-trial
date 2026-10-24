@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Tabs, Crest, FormGuide, SponsorPanel } from "../../components/ui";
-import { klasemen, teamNama, formGuide, TEAM_CODES, urutkanPosisi, hitungSkorsing } from "../../lib/rules";
+import { klasemen, teamNama, formGuide, TEAM_CODES, urutkanPosisi, hitungSkorsing, statusLaga } from "../../lib/rules";
 
 export default function KlasemenPage() {
   const { db, error, reload } = useDB();
@@ -22,7 +22,7 @@ export default function KlasemenPage() {
   const roster = TEAM_CODES.flatMap((t) => (db.teams[t] || []).map((m) => ({ userId: m.userId, team: t })));
   const golMap: Record<string, number> = {};
   roster.forEach((r) => { golMap[r.userId] = 0; });
-  ms.forEach((m) => {
+  ms.filter((m) => m.selesai).forEach((m) => {
     const rows = playerStats.filter((p) => p.match_id === m.id);
     if (rows.length > 0) rows.forEach((ps) => { golMap[ps.user_id] = (golMap[ps.user_id] || 0) + (ps.gol || 0); });
     else (m.goals || []).forEach((g) => { golMap[g.scorerId] = (golMap[g.scorerId] || 0) + 1; });
@@ -36,7 +36,7 @@ export default function KlasemenPage() {
   const MIN_LAGA_KIPER = 4;
   // Kiper terbaik: dari kebobolan yang diinput per kiper. Laga dihitung kalau kebobolannya diisi
   // (kosong = kiper itu tidak main). Urut rata-rata kebobolan terkecil, lalu clean sheet terbanyak.
-  const msIds = new Set(ms.map((m) => m.id));
+  const msIds = new Set(ms.filter((m) => m.selesai).map((m) => m.id));
   const kiper = TEAM_CODES.flatMap((t) => (db.teams[t] || []).filter((m) => m.posisi === "GK").map((m) => ({ userId: m.userId, team: t })))
     .map((g) => {
       const main = playerStats.filter((p) => p.user_id === g.userId && msIds.has(p.match_id) && p.kebobolan !== null && p.kebobolan !== undefined);
@@ -73,6 +73,8 @@ export default function KlasemenPage() {
                   <span className="stack" style={{ gap: 2, alignItems: "center" }}>
                     <span className={skor ? "scorebox" : "scorebox time"}>{skor ? `${m.sh} - ${m.sa}` : "vs"}</span>
                     {pk && <small className="muted" style={{ fontSize: 10 }}>PK: {teamNama(m.penalti_pemenang!)}</small>}
+                    {statusLaga(m) === "live" && <span className="pill bad" style={{ fontSize: 10, padding: "1px 6px" }}>LIVE</span>}
+                    {statusLaga(m) === "selesai" && <small className="muted" style={{ fontSize: 10 }}>Selesai</small>}
                   </span>
                   <span className="fx-team away"><Crest team={m.away} size="sm" /> {teamNama(m.away)}</span>
                 </Link>

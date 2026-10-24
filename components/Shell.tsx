@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { supa } from "../lib/supa";
 import { BASECAMP } from "../lib/club";
 import Icon, { MENU } from "./Icon";
+import { Sponsors } from "./ui";
 
 function isActive(path: string, href: string) {
   if (href === "/") return path === "/";
@@ -100,6 +101,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       <main id="isi">{children}</main>
 
       <footer className="site-footer noprint">
+        <div className="sponsor-band"><Sponsors /></div>
         <div className="wrap">
           <div>
             <div className="brand-row"><img src="/logo-muba.jpg" alt="" /><b style={{ color: "var(--on-black)" }}>MUBA FC</b></div>

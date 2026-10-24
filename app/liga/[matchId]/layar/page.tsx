@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useDB, Crest } from "../../../../components/ui";
+import { useDB, Crest, Sponsors } from "../../../../components/ui";
 import Icon from "../../../../components/Icon";
 import { supa } from "../../../../lib/supa";
 import { loadMatch, mergeMatch } from "../../../../lib/data";
@@ -84,6 +84,7 @@ export default function LayarSkor() {
         </div>
         {sisi(match.away)}
       </div>
+      <Sponsors className="layar-sponsors" label="Dipersembahkan oleh" />
     </div>
   );
 }

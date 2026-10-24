@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useDB, PageHead, Loading, LoadError, Tabs, Crest, FormGuide } from "../../components/ui";
+import { useDB, PageHead, Loading, LoadError, Tabs, Crest, FormGuide, Sponsors } from "../../components/ui";
 import { klasemen, teamNama, formGuide, TEAM_CODES, urutkanPosisi, hitungSkorsing } from "../../lib/rules";
 
 export default function KlasemenPage() {
@@ -54,6 +54,7 @@ export default function KlasemenPage() {
       <PageHead
         title="Klasemen"
         desc="Menang 3, menang adu penalti 2, kalah adu penalti 1, kalah 0. Urutan: poin, selisih gol, gol, fair play."
+        actions={<Sponsors label="Dipersembahkan oleh" />}
         tabs={<Tabs items={tabItems} value={selectedEd} onChange={setSelectedEd} label="Pilih edisi" />}
       />
       <div className="page wrap">

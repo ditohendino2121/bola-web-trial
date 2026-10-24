@@ -175,6 +175,16 @@ body.nav-open .drawer { transform: translateX(0); }
 .site-footer .brand-row img { width: 40px; height: 40px; border-radius: var(--r-1); object-fit: cover; }
 .site-footer .legal { border-top: 1px solid var(--black-line); font-size: 12px; padding: 14px var(--gutter); }
 
+/* ===== Sponsor liga ===== */
+.sponsors { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.sponsors img { height: 40px; width: auto; display: block; }
+.sponsors-label { font-size: 12px; color: var(--on-black-2); }
+.sponsor-band { border-bottom: 1px solid var(--black-line); }
+.sponsor-band .sponsors { justify-content: center; padding: 18px var(--gutter); max-width: var(--wrap); margin: 0 auto; }
+.sponsor-band .sponsors img { height: 52px; }
+.page-head .sponsors { margin: 0; gap: 14px; }
+.page-head .sponsors img { height: 34px; }
+
 /* ===== Page head (band hitam) ===== */
 .page-head { background: var(--black); color: var(--on-black); }
 .page-head .wrap { padding: 24px var(--gutter) 0; }
@@ -425,3 +435,8 @@ table.table.compact td, table.table.compact th { padding: 6px 8px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* Sponsor di tampilan layar: strip bawah, ukuran ikut lebar layar. */
+.layar-sponsors { justify-content: center; gap: 3vw; padding-top: 1.5vw; margin-top: 1.5vw; border-top: 1px solid var(--black-line); }
+.layar-sponsors img { height: 5.5vw; }
+.layar-sponsors .sponsors-label { font-size: 1.2vw; }

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useDB, PageHead, Loading, LoadError, Empty, DateBox, Crest, Meter, Tabs } from "../../components/ui";
+import { useDB, PageHead, Loading, LoadError, Empty, DateBox, Crest, Meter, Tabs, Sponsors } from "../../components/ui";
 import { supa } from "../../lib/supa";
 import { teamNama, TEAM_CODES, urutkanPosisi, lewatHariHLiga, hitungSkorsing, walletOf, totalKredit } from "../../lib/rules";
 import { tanggalID } from "../../lib/util";
@@ -47,6 +47,7 @@ export default function JadwalLiga() {
       <PageHead
         title="Jadwal liga"
         desc="Konfirmasi kehadiran tiap edisi di sini. 1 edisi = 1 kredit, batal paling lambat H-1 (kredit kembali)."
+        actions={<Sponsors label="Dipersembahkan oleh" />}
         tabs={<Tabs items={[{ key: "mendatang", label: `Mendatang (${mendatang.length})` }, { key: "lewat", label: `Sudah lewat (${lewat.length})` }]} value={tab} onChange={setTab} label="Filter jadwal liga" />}
       />
       <div className="page wrap">

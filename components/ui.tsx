@@ -121,6 +121,17 @@ export function FormGuide({ results }: { results: ("W" | "D" | "L")[] }) {
   );
 }
 
+/** Logo sponsor liga (KIM x DnA). PNG berlatar transparan, jadi ikut warna tempatnya. */
+export function Sponsors({ label = "Didukung oleh", className = "" }: { label?: string; className?: string }) {
+  return (
+    <div className={`sponsors ${className}`}>
+      {label && <span className="sponsors-label">{label}</span>}
+      <img src="/sponsor-kim.png" alt="Klinik Pratama Inpres Medika" />
+      <img src="/sponsor-dna.png" alt="DnA Sunat Center" />
+    </div>
+  );
+}
+
 /** Kotak kecil warna kartu (kuning/merah) — bukan ikon garis, karena warnanya sendiri yang jadi penanda. */
 export function CardTag({ kartu }: { kartu: "kuning" | "merah" }) {
   return <span className={`card-tag ${kartu}`} role="img" aria-label={`Kartu ${kartu}`} />;

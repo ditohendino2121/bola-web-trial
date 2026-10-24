@@ -32,6 +32,8 @@ export default function KlasemenPage() {
     .map((id) => ({ id, nama: db.users.find((x) => x.id === id)?.nama || id, tim: timOf(id), gol: golMap[id] || 0 }))
     .sort((a, b) => b.gol - a.gol);
 
+  // Syarat masuk peringkat Kiper terbaik (khusus Overall; per edisi tiap tim cuma main 1 laga).
+  const MIN_LAGA_KIPER = 4;
   // Kiper terbaik: dari kebobolan yang diinput per kiper. Laga dihitung kalau kebobolannya diisi
   // (kosong = kiper itu tidak main). Urut rata-rata kebobolan terkecil, lalu clean sheet terbanyak.
   const msIds = new Set(ms.map((m) => m.id));
@@ -45,7 +47,8 @@ export default function KlasemenPage() {
         rata: main.length ? total / main.length : null,
       };
     })
-    .sort((a, b) => (a.rata ?? Infinity) - (b.rata ?? Infinity) || b.cs - a.cs || b.main - a.main);
+    .map((g) => ({ ...g, lolos: selectedEd !== "overall" || g.main >= MIN_LAGA_KIPER }))
+    .sort((a, b) => Number(b.lolos) - Number(a.lolos) || (a.rata ?? Infinity) - (b.rata ?? Infinity) || b.cs - a.cs || b.main - a.main);
 
   const tabItems = [{ key: "overall", label: "Overall" }, ...editions.map((e) => ({ key: e.id, label: e.label }))];
 
@@ -128,15 +131,15 @@ export default function KlasemenPage() {
 
         <div className="panel">
           <h3>Kiper terbaik</h3>
-          <p className="muted" style={{ margin: "2px 0 8px" }}><small>Urut rata-rata kebobolan per laga (terkecil), lalu clean sheet terbanyak.</small></p>
+          <p className="muted" style={{ margin: "2px 0 8px" }}><small>Rata-rata = total kebobolan ÷ laga yang dimainkan (laga absen tidak dihitung). Urut rata-rata terkecil, lalu clean sheet terbanyak.{selectedEd === "overall" ? ` Masuk peringkat setelah main minimal ${MIN_LAGA_KIPER} laga.` : ""}</small></p>
           {kiper.length === 0 ? <p className="muted">Belum ada kiper di tim.</p> : (
             <div className="tablewrap scroll">
               <table className="table compact">
                 <thead><tr><th className="pos">#</th><th>Kiper</th><th className="n">Main</th><th className="n"><abbr title="Total kebobolan">Kbl</abbr></th><th className="n"><abbr title="Rata-rata kebobolan per laga">Rata</abbr></th><th className="n"><abbr title="Clean sheet (tidak kebobolan)">CS</abbr></th></tr></thead>
                 <tbody>{kiper.map((g, i) => (
-                  <tr key={g.userId} className={i === 0 && g.main > 0 ? "lead" : ""}>
-                    <td className="pos">{i + 1}</td>
-                    <td>{g.nama} <small className="muted">{teamNama(g.team)}</small></td>
+                  <tr key={g.userId} className={i === 0 && g.lolos && g.main > 0 ? "lead" : ""}>
+                    <td className="pos">{g.lolos ? i + 1 : "-"}</td>
+                    <td>{g.nama} <small className="muted">{teamNama(g.team)}</small>{!g.lolos && <> <span className="pill neutral">belum {MIN_LAGA_KIPER} laga</span></>}</td>
                     <td className="n">{g.main}</td>
                     <td className="n">{g.main ? g.total : "-"}</td>
                     <td className="n pts">{g.rata === null ? "-" : g.rata.toFixed(1)}</td>

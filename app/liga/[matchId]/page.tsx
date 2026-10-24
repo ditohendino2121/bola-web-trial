@@ -108,7 +108,8 @@ export default function LigaDetail() {
     const { data, error: e } = await supa().from("league_player_stats").upsert({
       match_id: matchId, user_id: r.user_id, team: r.team, posisi: r.posisi,
       gol: Number(r.gol) || 0, gol_bunuh_diri: Number(r.og) || 0, kartu: r.kartu,
-      kebobolan: r.posisi === "GK" && r.kebobolan !== "" ? Number(r.kebobolan) : null,
+      // Kosong atau "A" (absen) = kiper tidak main -> null, tidak ikut hitungan rata-rata.
+      kebobolan: r.posisi === "GK" && /^\d+$/.test(r.kebobolan) ? Number(r.kebobolan) : null,
       assist: 0, aksi_kunci: 0, shot_on_target: 0, blunder: 0, nilai_oto: null, override: null, catatan_override: "",
     }, { onConflict: "match_id,user_id" }).select().single();
     if (e) throw new Error(e.message);
@@ -213,7 +214,7 @@ export default function LigaDetail() {
 
         <div className="panel">
           <h3>Catatan pemain {isAdmin ? "" : "(lihat)"}</h3>
-          <p className="muted"><small>Gol tiap pemain, kebobolan tiap kiper (isi manual, kosongkan kalau kiper itu tidak main), dan kartu. {isAdmin ? "Tersimpan otomatis. " : ""}Skorsing dihitung otomatis dari kartu.</small></p>
+          <p className="muted"><small>Gol tiap pemain, kebobolan tiap kiper (isi angka; kosongkan atau isi A kalau kiper itu tidak main), dan kartu. {isAdmin ? "Tersimpan otomatis. " : ""}Skorsing dihitung otomatis dari kartu.</small></p>
           <div className="grid2">
             {[match.home, match.away].map((team) => {
               const list = rows.map((r, idx) => ({ r, idx })).filter(({ r }) => r.team === team);
@@ -229,7 +230,7 @@ export default function LigaDetail() {
                           <td>{r.posisi}</td>
                           <td className="n">{isAdmin ? <input style={{ width: 52 }} inputMode="numeric" value={r.gol} onChange={(e) => ubahBaris(idx, { gol: e.target.value.replace(/\D/g, "") })} /> : r.gol}</td>
                           <td className="n">{isAdmin ? <input style={{ width: 44 }} inputMode="numeric" value={r.og} onChange={(e) => ubahBaris(idx, { og: e.target.value.replace(/\D/g, "") })} /> : (Number(r.og) > 0 ? r.og : "")}</td>
-                          <td className="n">{r.posisi !== "GK" ? "" : isAdmin ? <input style={{ width: 52 }} inputMode="numeric" placeholder="-" value={r.kebobolan} onChange={(e) => ubahBaris(idx, { kebobolan: e.target.value.replace(/\D/g, "") })} /> : (r.kebobolan || "-")}</td>
+                          <td className="n">{r.posisi !== "GK" ? "" : isAdmin ? <input style={{ width: 52 }} placeholder="A" title="Angka kebobolan, atau A / kosong kalau kiper tidak main" value={r.kebobolan} onChange={(e) => { const v = e.target.value.trim(); ubahBaris(idx, { kebobolan: /^[aA]$/.test(v) ? "A" : v.replace(/\D/g, "") }); }} /> : (/^\d+$/.test(r.kebobolan) ? r.kebobolan : "A")}</td>
                           <td>
                             {isAdmin ? (
                               <div className="row" style={{ gap: 3, flexWrap: "nowrap" }}>

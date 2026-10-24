@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useDB, Loading, LoadError, StatusPill, Meter, DateBox } from "../components/ui";
+import { useDB, Loading, LoadError, StatusPill, Meter, DateBox, SponsorPanel } from "../components/ui";
 import { AuthPanel, AkadGate } from "../components/Account";
 import { walletOf, totalKredit, dikunciRSVP, kuotaAktif, klasemen, teamNama } from "../lib/rules";
 import { signOut } from "../lib/data";
@@ -59,6 +59,8 @@ export default function Home() {
         )}
         {!me && <div style={{ marginTop: 18 }}><a href="#akun"><button className="btn">Daftar untuk ikut main</button></a></div>}
       </div>
+
+      <SponsorPanel />
 
       {dates.length > 0 && (
         <div className="datestrip" role="list" aria-label="Pilih tanggal jadwal">

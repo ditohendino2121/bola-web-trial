@@ -132,6 +132,19 @@ export function Sponsors({ label = "Didukung oleh", className = "" }: { label?: 
   );
 }
 
+/** Panel sponsor besar (hitam, logo dibesarkan) untuk posisi utama: beranda, klasemen, jadwal liga. */
+export function SponsorPanel() {
+  return (
+    <section className="sponsor-panel" aria-label="Sponsor resmi">
+      <p className="sponsor-panel-label">Sponsor resmi KIM x DnA Health League</p>
+      <div className="sponsor-panel-logos">
+        <div><img src="/sponsor-kim.png" alt="Klinik Pratama Inpres Medika" /></div>
+        <div><img src="/sponsor-dna.png" alt="DnA Sunat Center" /></div>
+      </div>
+    </section>
+  );
+}
+
 /** Kotak kecil warna kartu (kuning/merah) — bukan ikon garis, karena warnanya sendiri yang jadi penanda. */
 export function CardTag({ kartu }: { kartu: "kuning" | "merah" }) {
   return <span className={`card-tag ${kartu}`} role="img" aria-label={`Kartu ${kartu}`} />;

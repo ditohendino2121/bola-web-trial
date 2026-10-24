@@ -440,3 +440,15 @@ table.table.compact td, table.table.compact th { padding: 6px 8px; }
 .layar-sponsors { justify-content: center; gap: 3vw; padding-top: 1.5vw; margin-top: 1.5vw; border-top: 1px solid var(--black-line); }
 .layar-sponsors img { height: 5.5vw; }
 .layar-sponsors .sponsors-label { font-size: 1.2vw; }
+
+/* Panel sponsor utama (beranda, klasemen, jadwal liga): hitam, logo besar, garis emas. */
+.sponsor-panel { background: var(--black); border-radius: var(--r-1); border-top: 3px solid var(--gold); padding: 16px 16px 20px; text-align: center; }
+.sponsor-panel-label { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: var(--gold-hi); }
+.sponsor-panel-logos { display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
+.sponsor-panel-logos > div { display: flex; justify-content: center; padding: 4px 12px; }
+.sponsor-panel-logos > div + div { border-left: 1px solid var(--black-line); }
+.sponsor-panel-logos img { height: 84px; width: auto; max-width: 100%; object-fit: contain; }
+@media (min-width: 760px) { .sponsor-panel-logos img { height: 110px; } }
+/* Baris sponsor kecil di atas match centre. */
+.mc-sponsors { justify-content: center; margin: 10px 0 2px; }
+.mc-sponsors img { height: 44px; }

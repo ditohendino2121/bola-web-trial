@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useDB, Loading, LoadError, Crest, Empty, CardTag } from "../../../components/ui";
+import { useDB, Loading, LoadError, Crest, Empty, CardTag, Sponsors } from "../../../components/ui";
 import Icon from "../../../components/Icon";
 import { supa } from "../../../lib/supa";
 import { mapPlayerStat } from "../../../lib/data";
@@ -176,6 +176,7 @@ export default function LigaDetail() {
             <div className="crumbs"><Link href="/liga">Liga</Link> / <Link href="/klasemen">Klasemen</Link></div>
             <a href={`/liga/${matchId}/layar`} target="_blank" rel="noreferrer" className="mast-chip ghost" style={{ marginLeft: 0 }}>Tampilan layar</a>
           </div>
+          <Sponsors className="mc-sponsors" label="Dipersembahkan oleh" />
           <div className="mc">
             {sisi(match.home)}
             <div className="mc-score">

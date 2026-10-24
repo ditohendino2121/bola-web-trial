@@ -152,8 +152,9 @@ body.nav-open .drawer { transform: translateX(0); }
     padding-bottom: env(safe-area-inset-bottom);
   }
   .bottomnav a {
-    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    color: var(--on-black-2); text-decoration: none; font-size: 10px; font-weight: 700; min-height: 44px;
+    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    color: var(--on-black-2); text-decoration: none; font-size: 9.5px; font-weight: 700; min-height: 44px;
+    text-align: center; line-height: 1.1; padding: 0 2px;
   }
   .bottomnav a svg { width: 20px; height: 20px; }
   .bottomnav a[aria-current="page"] { color: var(--gold); }

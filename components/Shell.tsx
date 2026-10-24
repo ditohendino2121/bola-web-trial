@@ -126,7 +126,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         <Link href="/" aria-current={path === "/" ? "page" : undefined}><Icon name="home" />Beranda</Link>
         <Link href="/jadwal" aria-current={isActive(path, "/jadwal") ? "page" : undefined}><Icon name="cal" />Jadwal</Link>
         <Link href="/topup" className="center"><Icon name="wallet" />Top-up</Link>
-        <Link href="/jadwal-liga" aria-current={isActive(path, "/jadwal-liga") || isActive(path, "/liga") ? "page" : undefined}><Icon name="clip" />Liga</Link>
+        <Link href="/jadwal-liga" aria-current={isActive(path, "/jadwal-liga") || isActive(path, "/liga") ? "page" : undefined}><Icon name="clip" />Jadwal liga</Link>
+        <Link href="/klasemen" aria-current={isActive(path, "/klasemen") ? "page" : undefined}><Icon name="chart" />Klasemen</Link>
         <Link href="/dashboard" aria-current={isActive(path, "/dashboard") ? "page" : undefined}><Icon name="user" />Saya</Link>
       </nav>
     </>

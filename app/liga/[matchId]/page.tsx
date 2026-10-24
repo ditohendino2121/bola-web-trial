@@ -44,6 +44,7 @@ export default function LigaDetail() {
         user_id: mem.userId, team: mem.team, posisi: mem.posisi,
         nama: db.users.find((u) => u.id === mem.userId)?.nama || mem.userId,
         gol: ex?.gol ?? 0, kartu: (ex?.kartu as Kartu) ?? "tidak",
+        kebobolan: ex?.kebobolan === null || ex?.kebobolan === undefined ? "" : String(ex.kebobolan),
       };
     }));
   }, [db, matchId]);
@@ -99,6 +100,7 @@ export default function LigaDetail() {
       const payload = rows.map((r) => ({
         match_id: matchId, user_id: r.user_id, team: r.team, posisi: r.posisi,
         gol: Number(r.gol) || 0, kartu: r.kartu,
+        kebobolan: r.posisi === "GK" && r.kebobolan !== "" ? Number(r.kebobolan) : null,
         assist: 0, aksi_kunci: 0, shot_on_target: 0, blunder: 0, nilai_oto: null, override: null, catatan_override: "",
       }));
       const { error: e } = await supa().from("league_player_stats").upsert(payload, { onConflict: "match_id,user_id" });
@@ -108,20 +110,21 @@ export default function LigaDetail() {
     setBusy(false);
   };
 
-  const hapusPenilaian = async () => {
-    if (!isAdmin || !confirm("Hapus semua catatan gol & kartu pertandingan ini? Tidak bisa dibatalkan.")) return;
+  // Reset total: skor, adu penalti, dan semua catatan pemain laga ini kembali kosong.
+  const resetPertandingan = async () => {
+    if (!isAdmin || !confirm("Reset pertandingan ini? Skor, adu penalti, gol, kebobolan, dan kartu semuanya dihapus. Tidak bisa dibatalkan.")) return;
     setBusy(true);
     try {
-      const { error: e } = await supa().from("league_player_stats").delete().eq("match_id", matchId);
-      if (e) throw new Error(e.message);
+      const { error: e1 } = await supa().from("league_player_stats").delete().eq("match_id", matchId);
+      if (e1) throw new Error(e1.message);
+      const { error: e2 } = await supa().from("league_matches").update({ sh: null, sa: null, penalti_pemenang: null }).eq("id", matchId);
+      if (e2) throw new Error(e2.message);
       await reload();
     } catch (e: any) { alert(e.message); }
     setBusy(false);
   };
 
   const updateRow = (idx: number, patch: any) => setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
-  const adaTersimpan = db.playerStats.some((p) => p.match_id === matchId);
-  const kebobolan = (team: string) => (team === match.home ? match.sa : match.sh);
 
   // Pencetak gol & kartu per tim (live-score style), di bawah logo masing-masing.
   const statLines = (team: string) => {
@@ -145,7 +148,10 @@ export default function LigaDetail() {
     <div>
       <div className="page-head">
         <div className="wrap" style={{ paddingBottom: 20 }}>
-          <div className="crumbs"><Link href="/liga">Liga</Link> / <Link href="/klasemen">Klasemen</Link></div>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div className="crumbs"><Link href="/liga">Liga</Link> / <Link href="/klasemen">Klasemen</Link></div>
+            <a href={`/liga/${matchId}/layar`} target="_blank" rel="noreferrer" className="mast-chip ghost" style={{ marginLeft: 0 }}>Tampilan layar</a>
+          </div>
           <div className="mc">
             {sisi(match.home)}
             <div className="mc-score">
@@ -184,7 +190,7 @@ export default function LigaDetail() {
 
         <div className="panel">
           <h3>Catatan pemain {isAdmin ? "" : "(lihat)"}</h3>
-          <p className="muted"><small>Gol tiap pemain, kebobolan kiper (otomatis dari skor), dan kartu. Skorsing dihitung otomatis dari kartu.</small></p>
+          <p className="muted"><small>Gol tiap pemain, kebobolan tiap kiper (isi manual, kosongkan kalau kiper itu tidak main), dan kartu. Skorsing dihitung otomatis dari kartu.</small></p>
           <div className="grid2">
             {[match.home, match.away].map((team) => {
               const list = rows.map((r, idx) => ({ r, idx })).filter(({ r }) => r.team === team);
@@ -199,7 +205,7 @@ export default function LigaDetail() {
                           <td>{r.nama}{(skorsing[r.user_id] || 0) > 0 && <> <span className="pill bad">Skorsing {skorsing[r.user_id]} laga</span></>}</td>
                           <td>{r.posisi}</td>
                           <td className="n">{isAdmin ? <input style={{ width: 52 }} inputMode="numeric" value={r.gol} onChange={(e) => updateRow(idx, { gol: e.target.value.replace(/\D/g, "") })} /> : r.gol}</td>
-                          <td className="n">{r.posisi === "GK" ? (kebobolan(team) ?? "-") : ""}</td>
+                          <td className="n">{r.posisi !== "GK" ? "" : isAdmin ? <input style={{ width: 52 }} inputMode="numeric" placeholder="-" value={r.kebobolan} onChange={(e) => updateRow(idx, { kebobolan: e.target.value.replace(/\D/g, "") })} /> : (r.kebobolan || "-")}</td>
                           <td>
                             {isAdmin ? (
                               <div className="row" style={{ gap: 3, flexWrap: "nowrap" }}>
@@ -218,13 +224,16 @@ export default function LigaDetail() {
               );
             })}
           </div>
-          {isAdmin && (
-            <div className="row" style={{ marginTop: 10 }}>
-              <button className="btn" disabled={busy} onClick={simpanPenilaian}>Simpan catatan pemain</button>
-              {adaTersimpan && <button className="btn danger" disabled={busy} onClick={hapusPenilaian}>Hapus catatan pertandingan ini</button>}
-            </div>
-          )}
+          {isAdmin && <button className="btn" style={{ marginTop: 10 }} disabled={busy} onClick={simpanPenilaian}>Simpan catatan pemain</button>}
         </div>
+
+        {isAdmin && (
+          <div className="panel" style={{ borderColor: "#F3C9C3" }}>
+            <h3>Reset pertandingan</h3>
+            <p className="muted"><small>Kosongkan skor, adu penalti, gol, kebobolan, dan kartu laga ini — misalnya setelah selesai tes.</small></p>
+            <button className="btn danger" disabled={busy} onClick={resetPertandingan}>Reset pertandingan</button>
+          </div>
+        )}
       </div>
     </div>
   );

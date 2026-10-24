@@ -50,6 +50,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   const loggedIn = kredit !== null;
 
+  // Tampilan layar besar (proyektor) tampil polos tanpa masthead/footer/nav.
+  if (path.endsWith("/layar")) return <main id="isi">{children}</main>;
+
   return (
     <>
       <a href="#isi" className="skip-link">Lewati ke isi</a>

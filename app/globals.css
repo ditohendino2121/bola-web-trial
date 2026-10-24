@@ -237,6 +237,13 @@ body.nav-open .drawer { transform: translateX(0); }
 .card-tag { display: inline-block; width: 11px; height: 15px; border-radius: 2px; vertical-align: -3px; }
 .card-tag.kuning { background: #F2C230; }
 .card-tag.merah { background: var(--bad); }
+/* Match centre: logo kiri, skor besar di tengah, logo kanan (pola ESPN/Premier League). */
+.mc { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 12px; margin-top: 8px; }
+.mc-side { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; min-width: 0; }
+.mc-team { font-weight: 700; margin: 0; color: var(--on-black); font-size: 14px; }
+.mc-side .statline { color: var(--on-black-2); }
+.mc-score { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 10px; color: var(--on-black-2); }
+.mc-num { font-size: clamp(40px, 9vw, 64px); font-weight: 800; font-variation-settings: "wdth" 75; color: var(--on-black); line-height: 1; white-space: nowrap; }
 .statline { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); justify-content: center; }
 .statline svg { width: 14px; height: 14px; flex-shrink: 0; }
 

@@ -20,7 +20,7 @@ export default function Home() {
   const next = upcoming[0];
   const dates = Array.from(new Set(upcoming.map((s) => s.tanggal))).sort();
   const greet = (() => { const h = new Date().getHours(); if (h < 11) return "Selamat pagi"; if (h < 15) return "Selamat siang"; if (h < 18) return "Selamat sore"; return "Selamat malam"; })();
-  const standings = klasemen(db.matches).slice(0, 4);
+  const standings = klasemen(db.matches, db.playerStats).slice(0, 4);
   const butuhAkad = me && (!me.setuju_akad || me.akad_version !== AKAD_VERSION);
 
   return (

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Crest, Empty } from "../../components/ui";
 import { supa } from "../../lib/supa";
 import { updateRow } from "../../lib/data";
-import { teamNama, walletOf, TEAM_CODES, lewatHariHLiga, urutkanPosisi } from "../../lib/rules";
+import { teamNama, walletOf, TEAM_CODES, lewatHariHLiga, urutkanPosisi, hitungSkorsing } from "../../lib/rules";
 
 const POSISI = ["GK", "Belakang", "Tengah", "Depan"] as const;
 
@@ -115,6 +115,7 @@ export default function LigaPage() {
     if (!(data as any)?.ok) throw new Error((data as any)?.msg || "Gagal batal.");
   });
 
+  const skorsing = hitungSkorsing(db.matches, db.playerStats, teams);
   const myPos = (() => { for (const t of TEAM_CODES) { const mem = (teams[t] || []).find((x) => x.userId === me?.id); if (mem) return mem.posisi; } return "Depan"; })();
 
   return (
@@ -164,7 +165,7 @@ export default function LigaPage() {
                     const u = db.users.find((x) => x.id === m.userId);
                     return (
                       <div key={i} className="person" style={{ justifyContent: "space-between" }}>
-                        <span><span className="pill neutral">{m.posisi}</span> {u?.nama || m.userId}</span>
+                        <span><span className="pill neutral">{m.posisi}</span> {u?.nama || m.userId} {(skorsing[m.userId] || 0) > 0 && <span className="pill bad">Skorsing {skorsing[m.userId]} laga</span>}</span>
                         {isAdmin && <button className="btn danger sm" disabled={busy} onClick={() => keluarkanPemain(t, m.userId)}>Keluarkan</button>}
                       </div>
                     );

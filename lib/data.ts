@@ -21,7 +21,7 @@ export interface Tx {
 }
 export interface Wallet { paket: number; reguler: number; paket_gk: number; reguler_gk: number; }
 export interface Goal { scorerId: string; }
-export interface Match { id: string; home: string; away: string; sh: number | null; sa: number | null; goals: Goal[]; tanggal?: string; jam?: string; lokasi?: string; edition_id?: string | null; }
+export interface Match { id: string; home: string; away: string; sh: number | null; sa: number | null; goals: Goal[]; tanggal?: string; jam?: string; lokasi?: string; edition_id?: string | null; penalti_pemenang?: string | null; }
 export interface TeamMember { userId: string; posisi: PosisiMain; }
 export interface LeagueEdition { id: string; label: string; tanggal: string; created_at: string; }
 export interface PlayerStat { id: string; match_id: string; user_id: string; team: string; posisi: string; gol: number; assist: number; aksi_kunci: number; shot_on_target: number; kartu: string; blunder: number; nilai_oto: number | null; override: number | null; catatan_override?: string; }
@@ -112,7 +112,7 @@ export async function loadAll(): Promise<DB> {
     pool,
     matches: (matches.data || []).map((m: any) => ({
       id: m.id, home: m.home, away: m.away, sh: m.sh, sa: m.sa,
-      goals: m.goals || [], tanggal: m.tanggal || "", jam: m.jam || "", lokasi: m.lokasi || "", edition_id: m.edition_id || null,
+      goals: m.goals || [], tanggal: m.tanggal || "", jam: m.jam || "", lokasi: m.lokasi || "", edition_id: m.edition_id || null, penalti_pemenang: m.penalti_pemenang || null,
     })),
     leagueLocked: !!meta.data?.locked,
     editions: (editions.data || []).map((e: any) => ({ id: e.id, label: e.label, tanggal: e.tanggal, created_at: e.created_at })),

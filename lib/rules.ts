@@ -1,6 +1,6 @@
 // Aturan bisnis murni (tanpa I/O): harga, kuota, klasemen, kredit, refund, kas.
 // Tidak ada perubahan nilai dari versi lama — hanya dipindah dari lib/store.ts.
-import type { DB, Schedule, PosisiMain, Wallet, Match } from "./data";
+import type { DB, Schedule, PosisiMain, Wallet, Match, PlayerStat } from "./data";
 
 export function walletOf(db: DB, userId: string): Wallet {
   return db.wallets[userId] || { paket: 0, reguler: 0, paket_gk: 0, reguler_gk: 0 };
@@ -56,34 +56,86 @@ export function lewatHariHLiga(s: Schedule): boolean {
   return todayISO >= s.tanggal;
 }
 
-export function klasemen(matches: Match[]) {
-  const t: Record<string, { M: number; W: number; D: number; L: number; GM: number; GA: number; P: number }> = {};
-  TEAM_CODES.forEach((k) => (t[k] = { M: 0, W: 0, D: 0, L: 0, GM: 0, GA: 0, P: 0 }));
+/** Pemenang laga: skor lebih besar, atau pemenang adu penalti kalau skor imbang. null = belum selesai. */
+export function pemenangLaga(m: Match): { menang: string; kalah: string; penalti: boolean } | null {
+  if (m.sh === null || m.sa === null) return null;
+  if (m.sh > m.sa) return { menang: m.home, kalah: m.away, penalti: false };
+  if (m.sa > m.sh) return { menang: m.away, kalah: m.home, penalti: false };
+  if (m.penalti_pemenang === m.home) return { menang: m.home, kalah: m.away, penalti: true };
+  if (m.penalti_pemenang === m.away) return { menang: m.away, kalah: m.home, penalti: true };
+  return null; // imbang tapi adu penalti belum diisi
+}
+
+/** Poin fair play (makin kecil makin baik): kuning 1, 2x kuning di 1 laga 3, merah langsung 4. */
+export const FAIRPLAY_POIN: Record<string, number> = { tidak: 0, kuning: 1, kuning2: 3, merah: 4 };
+
+/**
+ * Klasemen ala J-League: menang 3, menang adu penalti 2, kalah adu penalti 1, kalah 0 (tidak ada seri).
+ * Urutan: poin, selisih gol, gol dimasukkan (produktivitas), fair play (kartu lebih sedikit di atas).
+ */
+export function klasemen(matches: Match[], playerStats: PlayerStat[] = []) {
+  const t: Record<string, { M: number; W: number; WP: number; LP: number; L: number; GM: number; GA: number; P: number; FP: number }> = {};
+  TEAM_CODES.forEach((k) => (t[k] = { M: 0, W: 0, WP: 0, LP: 0, L: 0, GM: 0, GA: 0, P: 0, FP: 0 }));
   matches.forEach((m) => {
-    if (m.sh === null || m.sa === null) return;
+    const hasil = pemenangLaga(m);
+    if (!hasil) return;
     t[m.home].M++; t[m.away].M++;
     t[m.home].GM += m.sh!; t[m.home].GA += m.sa!;
     t[m.away].GM += m.sa!; t[m.away].GA += m.sh!;
-    if (m.sh! > m.sa!) { t[m.home].W++; t[m.home].P += 3; t[m.away].L++; }
-    else if (m.sh! < m.sa!) { t[m.away].W++; t[m.away].P += 3; t[m.home].L++; }
-    else { t[m.home].D++; t[m.away].D++; t[m.home].P++; t[m.away].P++; }
+    if (hasil.penalti) { t[hasil.menang].WP++; t[hasil.menang].P += 2; t[hasil.kalah].LP++; t[hasil.kalah].P += 1; }
+    else { t[hasil.menang].W++; t[hasil.menang].P += 3; t[hasil.kalah].L++; }
+  });
+  const ids = new Set(matches.map((m) => m.id));
+  playerStats.forEach((ps) => {
+    if (!ids.has(ps.match_id) || !t[ps.team]) return;
+    t[ps.team].FP += FAIRPLAY_POIN[ps.kartu] || 0;
   });
   return Object.entries(t)
     .map(([tim, s]) => ({ tim, ...s, GD: s.GM - s.GA }))
-    .sort((a, b) => b.P - a.P || b.GD - a.GD || b.GM - a.GM);
+    .sort((a, b) => b.P - a.P || b.GD - a.GD || b.GM - a.GM || a.FP - b.FP);
 }
 
-/** 5 hasil terakhir tiap tim, dari laga berskor, urut tanggal+jam. Dipakai Form di Klasemen. */
+/** 5 hasil terakhir tiap tim (W/L, adu penalti dihitung sesuai pemenangnya), urut tanggal+jam. */
 export function formGuide(matches: Match[], tim: string): ("W" | "D" | "L")[] {
   const ms = matches
-    .filter((m) => (m.home === tim || m.away === tim) && m.sh !== null && m.sa !== null)
+    .filter((m) => (m.home === tim || m.away === tim) && pemenangLaga(m))
     .slice()
     .sort((a, b) => `${a.tanggal || ""}${a.jam || ""}`.localeCompare(`${b.tanggal || ""}${b.jam || ""}`));
-  return ms.slice(-5).map((m) => {
-    const diri = m.home === tim ? m.sh! : m.sa!;
-    const lawan = m.home === tim ? m.sa! : m.sh!;
-    return diri > lawan ? "W" : diri < lawan ? "L" : "D";
-  });
+  return ms.slice(-5).map((m) => (pemenangLaga(m)!.menang === tim ? "W" : "L"));
+}
+
+/**
+ * Sisa skorsing tiap pemain (jumlah laga tim yang masih harus absen), dihitung dari laga yang sudah berskor:
+ * - 2 kartu kuning dari 2 laga berbeda -> skors 1 laga (akumulasi direset setelahnya)
+ * - 2 kartu kuning di 1 laga (kuning2) -> skors 1 laga
+ * - merah langsung -> skors 2 laga
+ * Skorsing berkurang 1 tiap tim pemain itu main, terlepas pemainnya tercatat main atau tidak.
+ */
+export function hitungSkorsing(matches: Match[], playerStats: PlayerStat[], teams: Record<string, { userId: string }[]>): Record<string, number> {
+  const sisa: Record<string, number> = {};
+  const akumulasi: Record<string, number> = {};
+  for (const team of TEAM_CODES) {
+    const squad = new Set((teams[team] || []).map((m) => m.userId));
+    const played = matches
+      .filter((m) => (m.home === team || m.away === team) && m.sh !== null && m.sa !== null)
+      .slice()
+      .sort((a, b) => `${a.tanggal || ""}${a.jam || ""}`.localeCompare(`${b.tanggal || ""}${b.jam || ""}`));
+    for (const m of played) {
+      squad.forEach((uid) => { if ((sisa[uid] || 0) > 0) sisa[uid] -= 1; });
+      playerStats.filter((p) => p.match_id === m.id && squad.has(p.user_id)).forEach((ps) => {
+        const uid = ps.user_id;
+        if (ps.kartu === "kuning") {
+          akumulasi[uid] = (akumulasi[uid] || 0) + 1;
+          if (akumulasi[uid] >= 2) { sisa[uid] = Math.max(sisa[uid] || 0, 1); akumulasi[uid] = 0; }
+        } else if (ps.kartu === "kuning2") {
+          sisa[uid] = Math.max(sisa[uid] || 0, 1); akumulasi[uid] = 0;
+        } else if (ps.kartu === "merah") {
+          sisa[uid] = Math.max(sisa[uid] || 0, 2); akumulasi[uid] = 0;
+        }
+      });
+    }
+  }
+  return sisa;
 }
 
 export const TEAM_CODES = ["A", "B", "C", "D"] as const;

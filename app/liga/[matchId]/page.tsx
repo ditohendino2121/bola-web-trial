@@ -124,8 +124,16 @@ export default function LigaDetail() {
   };
   const ubahBaris = (idx: number, patch: any, segera = false) => {
     const baru = { ...rows[idx], ...patch };
-    setRows((prev) => prev.map((r, i) => (i === idx ? baru : r)));
+    const nextRows = rows.map((r, i) => (i === idx ? baru : r));
+    setRows(nextRows);
     antre(`row-${baru.user_id}`, () => simpanBaris(baru), segera);
+    // Skor ikut otomatis = jumlah gol pemain tiap tim (masih bisa dikoreksi manual di kolom skor).
+    if ("gol" in patch) {
+      const total = (team: string) => String(nextRows.filter((r) => r.team === team).reduce((a, c) => a + (Number(c.gol) || 0), 0));
+      const nextSh = total(match.home); const nextSa = total(match.away);
+      setSh(nextSh); setSa(nextSa);
+      antre("skor", () => simpanSkor(nextSh, nextSa));
+    }
   };
 
   // Reset total: skor, adu penalti, dan semua catatan pemain laga ini kembali kosong.
@@ -193,7 +201,7 @@ export default function LigaDetail() {
         {isAdmin && (
           <div className="panel">
             <h3>Skor</h3>
-            <p className="muted"><small>Tersimpan otomatis setengah detik setelah selesai mengetik.</small></p>
+            <p className="muted"><small>Otomatis mengikuti jumlah gol pemain di tabel bawah. Boleh dikoreksi manual (misal gol bunuh diri) — tersimpan otomatis.</small></p>
             <div className="grid2">
               <label className="field"><span>Skor {teamNama(match.home)}</span><input inputMode="numeric" value={sh} placeholder="0" disabled={busy} onChange={(e) => ubahSkor("h", e.target.value)} /></label>
               <label className="field"><span>Skor {teamNama(match.away)}</span><input inputMode="numeric" value={sa} placeholder="0" disabled={busy} onChange={(e) => ubahSkor("a", e.target.value)} /></label>

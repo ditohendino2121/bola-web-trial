@@ -2,7 +2,7 @@
 // redesign.md bagian 6 untuk kontrak lengkap (baca, auth, RPC, tulis per halaman).
 import { supa } from "./supa";
 
-export type Role = "admin" | "player";
+export type Role = "superadmin" | "admin" | "player";
 export type Status = "pending" | "approved" | "rejected";
 export type RsvpStatus = "confirmed_lunas" | "confirmed_utang" | "confirmed_langsung" | "wajib_bayar" | "cancelled" | "no_show";
 export type RsvpMetode = "deposit" | "utang" | "langsung";
@@ -205,6 +205,29 @@ export async function alihSlot(rsvpId: string, penggantiId: string) {
   if (error) throw new Error(error.message);
   const r = data as any;
   if (!r?.ok) throw new Error(r?.msg || "Gagal alih slot");
+}
+
+/** RSVP jadwal liga: tanpa kuota posisi reguler, posisi diambil dari tim liga (lihat migration_v8). */
+export async function rsvpLiga(scheduleId: string, metode: "deposit" | "langsung") {
+  const { data, error } = await supa().rpc("rpc_rsvp_liga", { p_schedule: scheduleId, p_metode: metode });
+  if (error) throw new Error(error.message);
+  const r = data as any;
+  if (!r?.ok) throw new Error(r?.msg || "Gagal konfirmasi");
+}
+
+// ---------- password ----------
+/** Ganti password akun sendiri (harus sedang login). */
+export async function gantiPasswordSendiri(baru: string) {
+  if (baru.length < 6) throw new Error("Password minimal 6 karakter");
+  const { error } = await supa().auth.updateUser({ password: baru });
+  if (error) throw new Error(pesanAuth(error.message));
+}
+/** Super admin mengganti password akun lain (pemain lupa password). */
+export async function setPasswordAkun(userId: string, baru: string) {
+  const { data, error } = await supa().rpc("rpc_set_password", { p_user: userId, p_password: baru });
+  if (error) throw new Error(error.message);
+  const r = data as any;
+  if (!r?.ok) throw new Error(r?.msg || "Gagal mengganti password");
 }
 
 // ---------- klaim top-up ----------

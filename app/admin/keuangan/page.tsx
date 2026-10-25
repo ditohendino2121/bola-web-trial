@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useDB, PageHead, Loading, LoadError, Empty } from "../../../components/ui";
-import { saldoAwalBulan, rupiah } from "../../../lib/rules";
+import { saldoAwalBulan, rupiah, isAdmin } from "../../../lib/rules";
 import { updateRow, insertRow, deleteRow } from "../../../lib/data";
 import { JENIS_PENGELUARAN, BASECAMP } from "../../../lib/club";
 import { downloadCSV, namaBulanID } from "../../../lib/util";
@@ -28,7 +28,7 @@ export default function Keuangan() {
   if (error) return <div className="page wrap"><LoadError message={error} onRetry={reload} /></div>;
   if (!db) return <div className="page wrap"><Loading what="keuangan" /></div>;
   const me = db.users.find((u) => u.id === db.sessionId);
-  if (!me || me.role !== "admin") return <div className="page wrap"><Empty title="Khusus admin — login dengan akun admin." /></div>;
+  if (!me || !isAdmin(me)) return <div className="page wrap"><Empty title="Khusus admin — login dengan akun admin." /></div>;
 
   const run = async (fn: () => Promise<void>) => { setBusy(true); try { await fn(); await reload(); } catch (e: any) { alert(e.message); } setBusy(false); };
   const namaOf = (id: string) => db.users.find((u) => u.id === id)?.nama || id;

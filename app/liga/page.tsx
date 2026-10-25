@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Crest, Empty } from "../../components/ui";
 import { supa } from "../../lib/supa";
 import { updateRow } from "../../lib/data";
-import { teamNama, walletOf, TEAM_CODES, urutkanPosisi, hitungSkorsing } from "../../lib/rules";
+import { teamNama, walletOf, TEAM_CODES, urutkanPosisi, hitungSkorsing, isAdmin as isAdminRole } from "../../lib/rules";
 
 const POSISI = ["GK", "Belakang", "Tengah", "Depan"] as const;
 
@@ -19,7 +19,7 @@ export default function LigaPage() {
   if (!db) return <div className="page wrap"><Loading what="liga" /></div>;
 
   const me = db.users.find((u) => u.id === db.sessionId);
-  const isAdmin = me?.role === "admin";
+  const isAdmin = isAdminRole(me);
   const isMember = !!me?.is_member;
   const locked = !!db.leagueLocked;
   const teams = db.teams || { A: [], B: [], C: [], D: [] };

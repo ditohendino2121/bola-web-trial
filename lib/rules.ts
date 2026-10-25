@@ -2,6 +2,10 @@
 // Tidak ada perubahan nilai dari versi lama — hanya dipindah dari lib/store.ts.
 import type { DB, Schedule, PosisiMain, Wallet, Match, PlayerStat } from "./data";
 
+/** Admin = role admin atau superadmin. Super admin tambahan: bisa ganti password akun lain. */
+export function isAdmin(u?: { role?: string } | null) { return u?.role === "admin" || u?.role === "superadmin"; }
+export function isSuperAdmin(u?: { role?: string } | null) { return u?.role === "superadmin"; }
+
 export function walletOf(db: DB, userId: string): Wallet {
   return db.wallets[userId] || { paket: 0, reguler: 0, paket_gk: 0, reguler_gk: 0 };
 }

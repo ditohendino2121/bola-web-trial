@@ -6,7 +6,7 @@ import { useDB, Loading, LoadError, Crest, Empty, CardTag, Sponsors } from "../.
 import Icon from "../../../components/Icon";
 import { supa } from "../../../lib/supa";
 import { mapPlayerStat } from "../../../lib/data";
-import { teamNama, urutkanPosisi, hitungSkorsing, statusLaga } from "../../../lib/rules";
+import { teamNama, urutkanPosisi, hitungSkorsing, statusLaga, isAdmin as isAdminRole } from "../../../lib/rules";
 
 type Kartu = "tidak" | "kuning" | "kuning2" | "merah";
 const KARTU_OPSI: { k: Kartu; label: string }[] = [
@@ -64,7 +64,7 @@ export default function LigaDetail() {
   if (error) return <div className="page wrap"><LoadError message={error} onRetry={reload} /></div>;
   if (!db) return <div className="page wrap"><Loading what="detail laga" /></div>;
   const me = db.users.find((u) => u.id === db.sessionId);
-  const isAdmin = me?.role === "admin";
+  const isAdmin = isAdminRole(me);
   const match = db.matches.find((x) => x.id === matchId);
   if (!match) return <div className="page wrap"><Empty title="Laga tidak ditemukan" action={<div className="row" style={{ justifyContent: "center", marginTop: 10 }}><Link href="/liga"><button className="btn ghost">Ke Liga</button></Link><Link href="/klasemen"><button className="btn ghost">Ke Klasemen</button></Link></div>} /></div>;
 

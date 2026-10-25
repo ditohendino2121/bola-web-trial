@@ -3,7 +3,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Empty, DateBox, Crest, Meter, Tabs, SponsorPanel } from "../../components/ui";
 import { supa } from "../../lib/supa";
-import { teamNama, TEAM_CODES, urutkanPosisi, lewatHariHLiga, hitungSkorsing, walletOf, totalKredit, statusLaga } from "../../lib/rules";
+import { teamNama, TEAM_CODES, urutkanPosisi, lewatHariHLiga, hitungSkorsing, walletOf, totalKredit, statusLaga, isAdmin } from "../../lib/rules";
+import { rsvpLiga } from "../../lib/data";
 import { tanggalID } from "../../lib/util";
 
 function todayLocalISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
@@ -28,11 +29,8 @@ export default function JadwalLiga() {
   const tampil = tab === "mendatang" ? mendatang : lewat;
 
   const run = async (fn: () => Promise<void>) => { setBusy(true); try { await fn(); await reload(); } catch (e: any) { alert(e.message); } setBusy(false); };
-  const konfirmasi = (scheduleId: string, metode: "deposit" | "langsung") => run(async () => {
-    const { data, error: e } = await supa().rpc("rpc_rsvp", { p_schedule: scheduleId, p_posisi: myPos, p_metode: metode });
-    if (e) throw new Error(e.message);
-    if (!(data as any)?.ok) throw new Error((data as any)?.msg || "Gagal konfirmasi.");
-  });
+  // RSVP khusus liga (rpc_rsvp_liga): tanpa kuota posisi jadwal reguler, posisi dari tim liga.
+  const konfirmasi = (scheduleId: string, metode: "deposit" | "langsung") => run(() => rsvpLiga(scheduleId, metode));
   const batal = (scheduleId: string) => {
     if (!confirm("Batalkan kehadiran? Kredit dikembalikan.")) return;
     run(async () => {
@@ -54,7 +52,7 @@ export default function JadwalLiga() {
         {!me && <div className="note warn">Login dulu untuk konfirmasi kehadiran. <a href="/#akun" className="linkbtn">Masuk</a></div>}
         {me && !myTeam && <div className="note info">Kamu belum masuk tim liga. Konfirmasi hanya untuk pemain yang sudah diassign admin ke tim.</div>}
         {me && myTeam && <div className="note info">Kamu di <b>{teamNama(myTeam)}</b> sebagai <b>{myPos}</b> &middot; saldo {totalKredit(walletOf(db, me.id))} kredit{(skorsing[me.id] || 0) > 0 ? ` · sedang skorsing ${skorsing[me.id]} laga` : ""}</div>}
-        {me?.role === "admin" && <p className="muted"><small>Admin: buat edisi dan pertandingan baru di halaman <Link href="/liga" className="linkbtn">Liga</Link>.</small></p>}
+        {isAdmin(me) && <p className="muted"><small>Admin: buat edisi dan pertandingan baru di halaman <Link href="/liga" className="linkbtn">Liga</Link>.</small></p>}
 
         {tampil.length === 0 && <Empty title={tab === "mendatang" ? "Belum ada jadwal liga mendatang." : "Belum ada edisi yang lewat."} />}
 

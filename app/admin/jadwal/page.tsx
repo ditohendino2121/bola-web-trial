@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Empty } from "../../../components/ui";
-import { listAktif, kuotaAktif, STATUS_LABEL } from "../../../lib/rules";
+import { listAktif, kuotaAktif, STATUS_LABEL, isAdmin } from "../../../lib/rules";
 import { supa } from "../../../lib/supa";
 import { updateRow, insertRow, deleteRow, type ScheduleStatus } from "../../../lib/data";
 
@@ -17,7 +17,7 @@ export default function AdminJadwal() {
   if (error) return <div className="page wrap"><LoadError message={error} onRetry={reload} /></div>;
   if (!db) return <div className="page wrap"><Loading what="kelola jadwal" /></div>;
   const me = db.users.find((u) => u.id === db.sessionId);
-  if (!me || me.role !== "admin") return <div className="page wrap"><Empty title="Khusus admin — login dengan akun admin." /></div>;
+  if (!me || !isAdmin(me)) return <div className="page wrap"><Empty title="Khusus admin — login dengan akun admin." /></div>;
 
   const run = async (fn: () => Promise<void>) => { setBusy(true); try { await fn(); await reload(); } catch (e: any) { alert(e.message); } setBusy(false); };
 

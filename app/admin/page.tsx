@@ -5,13 +5,13 @@ import { useDB, PageHead, Tabs, Loading, LoadError, Empty } from "../../componen
 import {
   walletOf, listAktif, kuotaAktif, quotaPosisi,
   POSISI_MAIN, STATUS_LABEL, tunggakanOf, hargaSekali, totalTunggakanRp,
-  langsungBelumLunas, TARIF_KREDIT, nominalWallet, refundableWallet, totalBantuanGranted, totalMasuk,
-} from "../../lib/rules";
+  langsungBelumLunas, TARIF_KREDIT, nominalWallet, refundableWallet, totalBantuanGranted, totalMasuk, isAdmin } from "../../lib/rules";
 import { supa } from "../../lib/supa";
 import { updateRow, insertRow, deleteRow } from "../../lib/data";
 import { downloadCSV, today, acakTim, buildWAList } from "../../lib/util";
+import AkunTab from "./_parts/AkunTab";
 
-type Tab = "kelola-jadwal" | "approval" | "roster" | "kredit-manual" | "database" | "arus-kas" | "wallet";
+type Tab = "kelola-jadwal" | "approval" | "roster" | "kredit-manual" | "database" | "arus-kas" | "wallet" | "akun";
 const TABS: { key: Tab; label: string }[] = [
   { key: "kelola-jadwal", label: "Kelola jadwal" },
   { key: "approval", label: "Approval & pembayaran" },
@@ -20,6 +20,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "database", label: "Database pemain" },
   { key: "arus-kas", label: "Arus kas" },
   { key: "wallet", label: "Wallet" },
+  { key: "akun", label: "Akun & akses" },
 ];
 
 export default function Admin() {
@@ -56,7 +57,7 @@ export default function Admin() {
   if (error) return <div className="page wrap"><LoadError message={error} onRetry={reload} /></div>;
   if (!db) return <div className="page wrap"><Loading what="panel admin" /></div>;
   const me = db.users.find((u) => u.id === db.sessionId);
-  if (!me || me.role !== "admin") return <div className="page wrap"><Empty title="Khusus admin — login dengan akun admin." /></div>;
+  if (!me || !isAdmin(me)) return <div className="page wrap"><Empty title="Khusus admin — login dengan akun admin." /></div>;
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -558,6 +559,8 @@ export default function Admin() {
             </div>
           </div>
         )}
+
+        {tab === "akun" && <AkunTab db={db} me={me} reload={reload} />}
 
         {tab === "wallet" && (
           <div className="stack">

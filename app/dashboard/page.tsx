@@ -1,14 +1,41 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { useDB, PageHead, Loading, LoadError, Empty, DateBox } from "../../components/ui";
 import { walletOf, totalKredit, tunggakanOf, langsungBelumLunas, totalTunggakanRp } from "../../lib/rules";
-import { signOut } from "../../lib/data";
+import { signOut, gantiPasswordSendiri } from "../../lib/data";
 
 function badgeFor(status: string) {
   if (status === "confirmed_lunas") return <span className="pill ok">Lunas</span>;
   if (status === "confirmed_langsung") return <span className="pill info">Di tempat</span>;
   if (status === "no_show") return <span className="pill neutral">No-show</span>;
   return <span className="pill bad">Wajib bayar</span>;
+}
+
+function GantiPassword() {
+  const [baru, setBaru] = useState(""); const [ulang, setUlang] = useState("");
+  const [pesan, setPesan] = useState<{ jenis: "ok" | "err"; teks: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const simpan = async () => {
+    setPesan(null);
+    if (baru.length < 6) return setPesan({ jenis: "err", teks: "Password minimal 6 karakter." });
+    if (baru !== ulang) return setPesan({ jenis: "err", teks: "Ulangi password belum sama." });
+    setBusy(true);
+    try { await gantiPasswordSendiri(baru); setBaru(""); setUlang(""); setPesan({ jenis: "ok", teks: "Password berhasil diganti. Pakai password baru saat login berikutnya." }); }
+    catch (e: any) { setPesan({ jenis: "err", teks: e.message }); }
+    setBusy(false);
+  };
+  return (
+    <div className="panel">
+      <h3>Ganti password</h3>
+      <div className="grid2">
+        <label className="field"><span>Password baru</span><input type="password" autoComplete="new-password" value={baru} onChange={(e) => setBaru(e.target.value)} placeholder="Minimal 6 karakter" /></label>
+        <label className="field"><span>Ulangi password baru</span><input type="password" autoComplete="new-password" value={ulang} onChange={(e) => setUlang(e.target.value)} /></label>
+      </div>
+      <button className="btn" disabled={busy} onClick={simpan}>{busy ? "Menyimpan..." : "Simpan password baru"}</button>
+      {pesan && <div className={`note ${pesan.jenis}`} role="status" style={{ marginTop: 10 }}>{pesan.teks}</div>}
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -81,6 +108,8 @@ export default function Dashboard() {
             </table></div>
           )}
         </div>
+
+        <GantiPassword />
 
         <div className="panel">
           <h3>Data akun</h3>

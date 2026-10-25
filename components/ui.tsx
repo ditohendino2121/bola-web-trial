@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadAll, type DB } from "../lib/data";
+import { teamNama } from "../lib/rules";
 import Icon from "./Icon";
 
 /** Satu titik muat data: loadAll() + loading/error/reload, dipakai semua halaman. */
@@ -106,9 +107,9 @@ export function DateBox({ iso }: { iso: string }) {
   );
 }
 
-/** Perisai bersudut ala crest MUBA, huruf tim di tengah. Penanda, bukan logo resmi tim. */
+/** Logo resmi tim (public/team-a..d.png, latar transparan). */
 export function Crest({ team, size = "md" }: { team: string; size?: "sm" | "md" | "lg" }) {
-  return <span className={`crest sz-${size} team-${team}`} role="img" aria-label={`Tim ${team}`}>{team}</span>;
+  return <img className={`crest-img sz-${size}`} src={`/team-${team.toLowerCase()}.png`} alt={`Logo ${teamNama(team)}`} />;
 }
 
 const FORM_LABEL: Record<string, string> = { W: "menang", D: "seri", L: "kalah" };

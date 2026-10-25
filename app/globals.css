@@ -256,7 +256,7 @@ body.nav-open .drawer { transform: translateX(0); }
 .layar-fs { background: transparent; border: 1px solid var(--black-line); color: var(--on-black-2); border-radius: var(--r-2); padding: 6px 12px; cursor: pointer; font-size: 13px; }
 .layar-main { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr; gap: 3vw; align-items: start; padding-top: 3vw; }
 .layar-side { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1vw; min-width: 0; }
-.layar-side .crest.sz-lg { width: 9vw; height: 9.8vw; font-size: 4vw; }
+.layar-side .crest-img.sz-lg { width: 12vw; height: 12vw; }
 .layar-team { font-size: 2.6vw; font-weight: 800; font-variation-settings: "wdth" 112; }
 .layar-scorers { font-size: 1.8vw; color: var(--gold-hi); display: flex; flex-direction: column; gap: 0.4vw; }
 .layar-scorers svg { width: 1.6vw; height: 1.6vw; vertical-align: -0.2vw; }
@@ -461,3 +461,10 @@ table.table.compact td, table.table.compact th { padding: 6px 8px; }
 .install-footer .btn img { width: 20px; height: 20px; border-radius: 4px; }
 .install-footer p { font-size: 12px; color: var(--on-black-2); margin: 8px 0 0; line-height: 1.5; }
 .layar-ft { background: var(--black-line); color: var(--on-black-2); }
+
+/* Logo tim (gambar). Ukuran kotak tetap, gambar menyesuaikan tanpa terpotong. */
+.crest-img { display: inline-block; object-fit: contain; flex-shrink: 0; vertical-align: middle; }
+.crest-img.sz-sm { width: 28px; height: 28px; }
+.crest-img.sz-md { width: 40px; height: 40px; }
+.crest-img.sz-lg { width: 88px; height: 88px; }
+@media (min-width: 760px) { .crest-img.sz-lg { width: 110px; height: 110px; } }

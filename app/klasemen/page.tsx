@@ -42,13 +42,14 @@ export default function KlasemenPage() {
   const terbaik = peringkat(rekap);
   const bek = peringkat(rekap.filter((r) => r.posisi === "Belakang"));
   const mid = peringkat(rekap.filter((r) => r.posisi === "Tengah"));
-  // Kiper terbaik: rata-rata kebobolan per laga dihadiri, dikurangi bonus kalau hadir penuh. Urut terkecil, lalu clean sheet.
+  // Kiper terbaik: hanya laga saat jaga gawang. Rata-rata kebobolan per laga itu, dikurangi bonus kalau hadir penuh
+  // (hadir di semua laga tim, apa pun posisinya). Urut terkecil, lalu clean sheet.
   const kiper = rekap.filter((r) => r.posisi === "GK")
     .map((g) => {
-      const rata = g.main ? g.kebobolan / g.main : null;
-      return { ...g, rataAkhir: rata === null ? null : Math.max(0, rata - (g.penuh ? KIPER_BONUS_PENUH : 0)) };
+      const rata = g.mainGk ? g.kebobolan / g.mainGk : null;
+      return { ...g, lolos: g.mainGk >= minLaga, rataAkhir: rata === null ? null : Math.max(0, rata - (g.penuh ? KIPER_BONUS_PENUH : 0)) };
     })
-    .sort((a, b) => Number(b.lolos) - Number(a.lolos) || (a.rataAkhir ?? Infinity) - (b.rataAkhir ?? Infinity) || b.cs - a.cs || b.main - a.main);
+    .sort((a, b) => Number(b.lolos) - Number(a.lolos) || (a.rataAkhir ?? Infinity) - (b.rataAkhir ?? Infinity) || b.csGk - a.csGk || b.mainGk - a.mainGk);
   const syarat = overall ? ` Masuk peringkat setelah hadir minimal ${MIN_LAGA_PENGHARGAAN} laga.` : "";
 
   const tabItems = [{ key: "overall", label: "Overall" }, ...editions.map((e) => ({ key: e.id, label: e.label }))];
@@ -141,18 +142,18 @@ export default function KlasemenPage() {
 
         <div className="panel">
           <h3>Kiper terbaik</h3>
-          <p className="muted" style={{ margin: "2px 0 8px" }}><small>Rata-rata = total kebobolan ÷ laga yang dihadiri. Hadir di semua laga: rata-rata dikurangi {String(KIPER_BONUS_PENUH).replace(".", ",")}. Urut rata-rata terkecil, lalu clean sheet terbanyak.{syarat}</small></p>
+          <p className="muted" style={{ margin: "2px 0 8px" }}><small>Hanya laga saat jaga gawang. Rata-rata = total kebobolan ÷ laga sebagai kiper. Hadir di semua laga: rata-rata dikurangi {String(KIPER_BONUS_PENUH).replace(".", ",")}. Urut rata-rata terkecil, lalu clean sheet terbanyak.{syarat}</small></p>
           {kiper.length === 0 ? <p className="muted">Belum ada kiper di tim.</p> : (
             <div className="tablewrap scroll">
               <table className="table compact">
-                <thead><tr><th className="pos">#</th><th>Kiper</th><th className="n"><abbr title="Laga dihadiri / laga tim">Main</abbr></th><th className="n"><abbr title="Total kebobolan">Kbl</abbr></th><th className="n"><abbr title="Clean sheet (tidak kebobolan)">CS</abbr></th><th className="n"><abbr title="Rata-rata kebobolan per laga, setelah bonus hadir penuh">Rata</abbr></th></tr></thead>
+                <thead><tr><th className="pos">#</th><th>Kiper</th><th className="n"><abbr title="Laga sebagai kiper / laga tim">Main</abbr></th><th className="n"><abbr title="Total kebobolan">Kbl</abbr></th><th className="n"><abbr title="Clean sheet (tidak kebobolan)">CS</abbr></th><th className="n"><abbr title="Rata-rata kebobolan per laga, setelah bonus hadir penuh">Rata</abbr></th></tr></thead>
                 <tbody>{kiper.map((g, i) => (
                   <tr key={g.userId} className={i === 0 && g.lolos ? "lead" : ""}>
                     <td className="pos">{g.lolos ? i + 1 : "-"}</td>
                     <td>{g.nama} <small className="muted">{teamNama(g.team)}</small>{g.penuh && <> <span className="pill ok">Hadir penuh</span></>}{!g.lolos && <> <span className="pill neutral">belum {minLaga} laga</span></>}</td>
-                    <td className="n">{g.main}/{g.lagaTim}</td>
-                    <td className="n">{g.main ? g.kebobolan : "-"}</td>
-                    <td className="n">{g.main ? g.cs : "-"}</td>
+                    <td className="n">{g.mainGk}/{g.lagaTim}</td>
+                    <td className="n">{g.mainGk ? g.kebobolan : "-"}</td>
+                    <td className="n">{g.mainGk ? g.csGk : "-"}</td>
                     <td className="n pts">{g.rataAkhir === null ? "-" : g.rataAkhir.toFixed(1)}</td>
                   </tr>
                 ))}</tbody>
@@ -204,6 +205,7 @@ function TabelPoin({ judul, ket, list, minLaga, tampilPos }: { judul: string; ke
                 <td className="pos">{r.lolos ? i + 1 : "-"}</td>
                 <td>
                   {r.nama} <small className="muted">{tampilPos ? `${r.posisi} · ` : ""}{teamNama(r.team)}</small>
+                  {r.posisi !== r.posisiTerdaftar && <> <span className="pill info">terdaftar {r.posisiTerdaftar}</span></>}
                   {r.penuh && <> <span className="pill ok">Hadir penuh</span></>}
                   {!r.lolos && <> <span className="pill neutral">belum {minLaga} laga</span></>}
                 </td>
@@ -248,6 +250,8 @@ function CaraHitung() {
         Clean sheet kiper = kiper itu tidak kebobolan. Clean sheet bek dan tengah = timnya tidak kebobolan di laga yang dia hadiri.
         Hanya laga yang sudah selesai yang dihitung. Kalau poin sama, urutan dilihat dari gol + assist, lalu laga dihadiri, lalu kartu paling sedikit.
         Kiper terbaik tetap memakai rata-rata kebobolan, tanpa poin menang.
+        Poin tiap laga mengikuti posisi yang dimainkan di laga itu (diatur admin di detail laga). Pemain masuk tabel
+        penghargaan sesuai posisi yang paling sering dia mainkan.
       </small></p>
     </details>
   );

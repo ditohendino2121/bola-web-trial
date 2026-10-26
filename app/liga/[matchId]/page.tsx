@@ -6,7 +6,7 @@ import { useDB, Loading, LoadError, Crest, Empty, CardTag, Sponsors } from "../.
 import Icon from "../../../components/Icon";
 import { supa } from "../../../lib/supa";
 import { mapPlayerStat } from "../../../lib/data";
-import { teamNama, urutkanPosisi, hitungSkorsing, statusLaga, isAdmin as isAdminRole } from "../../../lib/rules";
+import { teamNama, urutkanPosisi, hitungSkorsing, statusLaga, POSISI_MAIN, isAdmin as isAdminRole } from "../../../lib/rules";
 
 type Kartu = "tidak" | "kuning" | "kuning2" | "merah";
 const KARTU_OPSI: { k: Kartu; label: string }[] = [
@@ -51,7 +51,7 @@ export default function LigaDetail() {
     setRows(all.map((mem) => {
       const ex = existing.find((e) => e.user_id === mem.userId);
       return {
-        user_id: mem.userId, team: mem.team, posisi: mem.posisi,
+        user_id: mem.userId, team: mem.team, posisi: ex?.posisi || mem.posisi, posisiTerdaftar: mem.posisi,
         nama: db.users.find((u) => u.id === mem.userId)?.nama || mem.userId,
         hadir: ex ? ex.hadir : false,
         gol: ex ? String(ex.gol ?? 0) : "0", assist: ex ? String(ex.assist ?? 0) : "0", og: ex ? String(ex.gol_bunuh_diri ?? 0) : "0", kartu: (ex?.kartu as Kartu) ?? "tidak",
@@ -123,6 +123,7 @@ export default function LigaDetail() {
     let patch = patchAwal;
     // Absen: semua catatan dikosongkan. Mengisi gol/assist/kebobolan/kartu otomatis menandai hadir.
     if (patch.hadir === false) patch = { ...patch, gol: "0", assist: "0", og: "0", kartu: "tidak", kebobolan: "" };
+    if ("posisi" in patch) patch = { ...patch, kebobolan: "" }; // ganti posisi: kebobolan diisi ulang (hanya untuk GK)
     else if (!rows[idx].hadir && (["gol", "assist", "og", "kebobolan"].some((k) => k in patch && patch[k] !== "") || (patch.kartu && patch.kartu !== "tidak"))) patch = { ...patch, hadir: true };
     const baru = { ...rows[idx], ...patch };
     const nextRows = rows.map((r, i) => (i === idx ? baru : r));
@@ -267,7 +268,7 @@ Setelah ini skor terkunci dan masuk klasemen.`)) return;
 
         <div className="panel">
           <h3>Catatan pemain {isAdmin ? "" : "(lihat)"}</h3>
-          <p className="muted"><small>Centang Hadir untuk tiap pemain yang main — absensi dipakai untuk penghargaan pemain terbaik. Lalu isi gol, assist, kebobolan kiper, dan kartu (mengisinya otomatis mencentang Hadir). {isAdmin ? "Tersimpan otomatis. " : ""}Skorsing dihitung otomatis dari kartu.</small></p>
+          <p className="muted"><small>Centang Hadir untuk tiap pemain yang main — absensi dipakai untuk penghargaan pemain terbaik. Ganti Pos kalau pemain dimainkan di posisi lain (mis. kiper jadi bek); poin laga itu ikut posisi tersebut. Lalu isi gol, assist, kebobolan kiper, dan kartu (mengisinya otomatis mencentang Hadir). {isAdmin ? "Tersimpan otomatis. " : ""}Skorsing dihitung otomatis dari kartu.</small></p>
           <div className="grid2">
             {[match.home, match.away].map((team) => {
               const list = rows.map((r, idx) => ({ r, idx })).filter(({ r }) => r.team === team);
@@ -283,7 +284,11 @@ Setelah ini skor terkunci dan masuk klasemen.`)) return;
                       {list.map(({ r, idx }) => (
                         <tr key={r.user_id} style={r.hadir ? undefined : { opacity: 0.55 }}>
                           <td>{r.nama}{(skorsing[r.user_id] || 0) > 0 && <> <span className="pill bad">Skorsing {skorsing[r.user_id]} laga</span></>}</td>
-                          <td>{r.posisi}</td>
+                          <td>{bisaEdit ? (
+                            <select style={{ width: "auto", minWidth: 84 }} value={r.posisi} aria-label={`Posisi ${r.nama} di laga ini`} title={`Posisi di laga ini (terdaftar: ${r.posisiTerdaftar})`} onChange={(e) => ubahBaris(idx, { posisi: e.target.value }, true)}>
+                              {POSISI_MAIN.map((p) => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                          ) : r.posisi}{r.posisi !== r.posisiTerdaftar && <><br /><small className="muted">terdaftar {r.posisiTerdaftar}</small></>}</td>
                           <td>{bisaEdit ? <input type="checkbox" checked={!!r.hadir} aria-label={`${r.nama} hadir`} onChange={(e) => ubahBaris(idx, { hadir: e.target.checked }, true)} /> : (r.hadir ? "Ya" : "-")}</td>
                           <td className="n">{bisaEdit ? <input style={{ width: 52 }} inputMode="numeric" value={r.gol} onChange={(e) => ubahBaris(idx, { gol: e.target.value.replace(/\D/g, "") })} /> : r.gol}</td>
                           <td className="n">{bisaEdit ? <input style={{ width: 52 }} inputMode="numeric" value={r.assist} onChange={(e) => ubahBaris(idx, { assist: e.target.value.replace(/\D/g, "") })} /> : r.assist}</td>

@@ -169,38 +169,51 @@ export const MIN_LAGA_PENGHARGAAN = 4;
 export const KIPER_BONUS_PENUH = 0.5;
 
 export interface RekapPemain {
-  userId: string; team: string; posisi: string;
+  userId: string; team: string;
+  posisi: string;            // kategori penghargaan: posisi yang paling sering dimainkan
+  posisiTerdaftar: string;   // posisi di daftar tim
   main: number; lagaTim: number; penuh: boolean; menang: number; menangPk: number;
-  gol: number; assist: number; cs: number; kebobolan: number; kartu: number; poin: number;
+  gol: number; assist: number; cs: number; kartu: number; poin: number;
+  mainGk: number; kebobolan: number; csGk: number; // hanya laga saat jaga gawang (untuk Kiper terbaik)
 }
 
 /**
  * Rekap tiap pemain di tim dari laga yang sudah selesai (matches = cakupan: overall atau satu edisi).
+ * Posisi diambil per laga (admin bisa mengganti, mis. kiper dimainkan sebagai bek), jadi poin gol/assist/
+ * clean sheet tiap laga mengikuti posisi di laga itu. Kategori penghargaan = posisi paling sering dimainkan
+ * (seri -> posisi terdaftar).
  * Clean sheet: kiper = kebobolannya sendiri 0; bek/tengah = timnya tidak kebobolan di laga itu.
- * Hadir penuh = hadir di semua laga selesai timnya (minimal 1 laga).
+ * Hadir penuh = hadir di semua laga selesai timnya (minimal 1 laga), apa pun posisinya.
  */
 export function rekapPemain(matches: Match[], playerStats: PlayerStat[], teams: Record<string, { userId: string; posisi: string }[]>): RekapPemain[] {
   const selesai = matches.filter((m) => m.selesai && m.sh !== null && m.sa !== null);
   const byId = new Map(selesai.map((m) => [m.id, m]));
+  const P = POIN_PEMAIN;
   return TEAM_CODES.flatMap((team) => (teams[team] || []).map((mem) => {
     const lagaTim = selesai.filter((m) => m.home === team || m.away === team).length;
     const rows = playerStats.filter((p) => p.user_id === mem.userId && p.hadir && byId.has(p.match_id));
-    let gol = 0, assist = 0, cs = 0, kebobolan = 0, kartu = 0, menang = 0, menangPk = 0;
+    let gol = 0, assist = 0, cs = 0, kartu = 0, menang = 0, menangPk = 0, poin = 0;
+    let mainGk = 0, kebobolan = 0, csGk = 0;
+    const jumlahPosisi: Record<string, number> = {};
     rows.forEach((p) => {
       const m = byId.get(p.match_id)!;
+      const pos = p.posisi || mem.posisi;
+      jumlahPosisi[pos] = (jumlahPosisi[pos] || 0) + 1;
       gol += p.gol || 0; assist += p.assist || 0; kartu += FAIRPLAY_POIN[p.kartu] || 0;
+      poin += P.hadir + (p.gol || 0) * (P.gol[pos] || 0) + (p.assist || 0) * (P.assist[pos] || 0) - (FAIRPLAY_POIN[p.kartu] || 0);
       const hasil = pemenangLaga(m);
-      if (hasil?.menang === team) { if (hasil.penalti) menangPk++; else menang++; }
-      if (mem.posisi === "GK") { kebobolan += p.kebobolan || 0; if (!p.kebobolan) cs++; }
-      else if ((p.team === m.home ? m.sa : m.sh) === 0) cs++;
+      if (hasil?.menang === team) { if (hasil.penalti) { menangPk++; poin += P.menangPenalti; } else { menang++; poin += P.menang; } }
+      const bersih = pos === "GK" ? !p.kebobolan : (p.team === m.home ? m.sa : m.sh) === 0;
+      if (bersih && P.cleanSheet[pos]) { cs++; poin += P.cleanSheet[pos]; }
+      if (pos === "GK") { mainGk++; kebobolan += p.kebobolan || 0; if (!p.kebobolan) csGk++; }
     });
     const main = rows.length;
     const penuh = lagaTim > 0 && main >= lagaTim;
-    const poin = main * POIN_PEMAIN.hadir + (penuh ? POIN_PEMAIN.hadirPenuh : 0)
-      + menang * POIN_PEMAIN.menang + menangPk * POIN_PEMAIN.menangPenalti
-      + gol * (POIN_PEMAIN.gol[mem.posisi] || 0) + assist * (POIN_PEMAIN.assist[mem.posisi] || 0)
-      + cs * (POIN_PEMAIN.cleanSheet[mem.posisi] || 0) - kartu;
-    return { userId: mem.userId, team, posisi: mem.posisi, main, lagaTim, penuh, menang, menangPk, gol, assist, cs, kebobolan, kartu, poin };
+    if (penuh) poin += P.hadirPenuh;
+    const terbanyak = Math.max(0, ...Object.values(jumlahPosisi));
+    const posisi = !main || jumlahPosisi[mem.posisi] === terbanyak ? mem.posisi
+      : POSISI_MAIN.find((k) => jumlahPosisi[k] === terbanyak) || mem.posisi;
+    return { userId: mem.userId, team, posisi, posisiTerdaftar: mem.posisi, main, lagaTim, penuh, menang, menangPk, gol, assist, cs, kartu, poin, mainGk, kebobolan, csGk };
   }));
 }
 

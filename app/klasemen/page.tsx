@@ -196,7 +196,7 @@ function TabelPoin({ judul, ket, list, minLaga, tampilPos }: { judul: string; ke
           <table className="table compact">
             <thead><tr>
               <th className="pos">#</th><th>Pemain</th><th className="n"><abbr title="Laga dihadiri / laga tim">Main</abbr></th>
-              <th className="n">Gol</th><th className="n"><abbr title="Assist">Ast</abbr></th><th className="n"><abbr title="Clean sheet">CS</abbr></th>
+              <th className="n"><abbr title="Menang (adu penalti dalam kurung) di laga yang dihadiri">Mng</abbr></th><th className="n">Gol</th><th className="n"><abbr title="Assist">Ast</abbr></th><th className="n"><abbr title="Clean sheet">CS</abbr></th>
               <th className="n"><abbr title="Poin kartu (dikurangkan)">Kartu</abbr></th><th className="n">Poin</th>
             </tr></thead>
             <tbody>{list.map((r, i) => (
@@ -208,6 +208,7 @@ function TabelPoin({ judul, ket, list, minLaga, tampilPos }: { judul: string; ke
                   {!r.lolos && <> <span className="pill neutral">belum {minLaga} laga</span></>}
                 </td>
                 <td className="n">{r.main}/{r.lagaTim}</td>
+                <td className="n">{r.menang}{r.menangPk ? ` (${r.menangPk})` : ""}</td>
                 <td className="n">{r.gol}</td>
                 <td className="n">{r.assist}</td>
                 <td className="n">{r.cs}</td>
@@ -235,6 +236,7 @@ function CaraHitung() {
           <tbody>
             <tr><td>Hadir di laga</td><td className="n" colSpan={4}>+{P.hadir} per laga</td></tr>
             <tr><td>Hadir di semua laga tim</td><td className="n" colSpan={4}>+{P.hadirPenuh} bonus</td></tr>
+            <tr><td>Tim menang / menang adu penalti</td><td className="n" colSpan={4}>+{P.menang} / +{P.menangPenalti} (hanya kalau hadir)</td></tr>
             <tr><td>Gol</td>{POSISI_KOLOM.map((k) => <td key={k} className="n">{sel(P.gol[k])}</td>)}</tr>
             <tr><td>Assist</td>{POSISI_KOLOM.map((k) => <td key={k} className="n">{sel(P.assist[k])}</td>)}</tr>
             <tr><td>Clean sheet</td>{POSISI_KOLOM.map((k) => <td key={k} className="n">{sel(P.cleanSheet[k])}</td>)}</tr>
@@ -245,7 +247,7 @@ function CaraHitung() {
       <p className="muted" style={{ marginTop: 8 }}><small>
         Clean sheet kiper = kiper itu tidak kebobolan. Clean sheet bek dan tengah = timnya tidak kebobolan di laga yang dia hadiri.
         Hanya laga yang sudah selesai yang dihitung. Kalau poin sama, urutan dilihat dari gol + assist, lalu laga dihadiri, lalu kartu paling sedikit.
-        Kiper terbaik tetap memakai rata-rata kebobolan.
+        Kiper terbaik tetap memakai rata-rata kebobolan, tanpa poin menang.
       </small></p>
     </details>
   );

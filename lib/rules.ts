@@ -157,6 +157,8 @@ export function hitungSkorsing(matches: Match[], playerStats: PlayerStat[], team
 export const POIN_PEMAIN = {
   hadir: 2,          // tiap laga yang dihadiri
   hadirPenuh: 5,     // bonus kalau hadir di semua laga tim
+  menang: 2,         // tim menang di laga yang dihadiri
+  menangPenalti: 1,  // tim menang lewat adu penalti
   gol: { GK: 0, Belakang: 6, Tengah: 5, Depan: 4 } as Record<string, number>,
   assist: { GK: 0, Belakang: 3, Tengah: 3, Depan: 3 } as Record<string, number>,
   cleanSheet: { GK: 5, Belakang: 4, Tengah: 2, Depan: 0 } as Record<string, number>,
@@ -168,7 +170,7 @@ export const KIPER_BONUS_PENUH = 0.5;
 
 export interface RekapPemain {
   userId: string; team: string; posisi: string;
-  main: number; lagaTim: number; penuh: boolean;
+  main: number; lagaTim: number; penuh: boolean; menang: number; menangPk: number;
   gol: number; assist: number; cs: number; kebobolan: number; kartu: number; poin: number;
 }
 
@@ -183,19 +185,22 @@ export function rekapPemain(matches: Match[], playerStats: PlayerStat[], teams: 
   return TEAM_CODES.flatMap((team) => (teams[team] || []).map((mem) => {
     const lagaTim = selesai.filter((m) => m.home === team || m.away === team).length;
     const rows = playerStats.filter((p) => p.user_id === mem.userId && p.hadir && byId.has(p.match_id));
-    let gol = 0, assist = 0, cs = 0, kebobolan = 0, kartu = 0;
+    let gol = 0, assist = 0, cs = 0, kebobolan = 0, kartu = 0, menang = 0, menangPk = 0;
     rows.forEach((p) => {
       const m = byId.get(p.match_id)!;
       gol += p.gol || 0; assist += p.assist || 0; kartu += FAIRPLAY_POIN[p.kartu] || 0;
+      const hasil = pemenangLaga(m);
+      if (hasil?.menang === team) { if (hasil.penalti) menangPk++; else menang++; }
       if (mem.posisi === "GK") { kebobolan += p.kebobolan || 0; if (!p.kebobolan) cs++; }
       else if ((p.team === m.home ? m.sa : m.sh) === 0) cs++;
     });
     const main = rows.length;
     const penuh = lagaTim > 0 && main >= lagaTim;
     const poin = main * POIN_PEMAIN.hadir + (penuh ? POIN_PEMAIN.hadirPenuh : 0)
+      + menang * POIN_PEMAIN.menang + menangPk * POIN_PEMAIN.menangPenalti
       + gol * (POIN_PEMAIN.gol[mem.posisi] || 0) + assist * (POIN_PEMAIN.assist[mem.posisi] || 0)
       + cs * (POIN_PEMAIN.cleanSheet[mem.posisi] || 0) - kartu;
-    return { userId: mem.userId, team, posisi: mem.posisi, main, lagaTim, penuh, gol, assist, cs, kebobolan, kartu, poin };
+    return { userId: mem.userId, team, posisi: mem.posisi, main, lagaTim, penuh, menang, menangPk, gol, assist, cs, kebobolan, kartu, poin };
   }));
 }
 

@@ -149,6 +149,61 @@ export function hitungSkorsing(matches: Match[], playerStats: PlayerStat[], team
   return sisa;
 }
 
+/**
+ * Poin penghargaan pemain, mengacu pola fantasy football (gol pemain belakang paling mahal karena paling
+ * jarang, clean sheet paling berharga untuk kiper & bek). Kartu memakai angka yang sama dengan fair play.
+ * Kiper tidak dapat poin gol/assist, pemain depan tidak dapat poin clean sheet.
+ */
+export const POIN_PEMAIN = {
+  hadir: 2,          // tiap laga yang dihadiri
+  hadirPenuh: 5,     // bonus kalau hadir di semua laga tim
+  gol: { GK: 0, Belakang: 6, Tengah: 5, Depan: 4 } as Record<string, number>,
+  assist: { GK: 0, Belakang: 3, Tengah: 3, Depan: 3 } as Record<string, number>,
+  cleanSheet: { GK: 5, Belakang: 4, Tengah: 2, Depan: 0 } as Record<string, number>,
+};
+/** Syarat masuk peringkat penghargaan (Overall). */
+export const MIN_LAGA_PENGHARGAAN = 4;
+/** Bonus hadir penuh untuk kiper terbaik: rata-rata kebobolan dikurangi angka ini. */
+export const KIPER_BONUS_PENUH = 0.5;
+
+export interface RekapPemain {
+  userId: string; team: string; posisi: string;
+  main: number; lagaTim: number; penuh: boolean;
+  gol: number; assist: number; cs: number; kebobolan: number; kartu: number; poin: number;
+}
+
+/**
+ * Rekap tiap pemain di tim dari laga yang sudah selesai (matches = cakupan: overall atau satu edisi).
+ * Clean sheet: kiper = kebobolannya sendiri 0; bek/tengah = timnya tidak kebobolan di laga itu.
+ * Hadir penuh = hadir di semua laga selesai timnya (minimal 1 laga).
+ */
+export function rekapPemain(matches: Match[], playerStats: PlayerStat[], teams: Record<string, { userId: string; posisi: string }[]>): RekapPemain[] {
+  const selesai = matches.filter((m) => m.selesai && m.sh !== null && m.sa !== null);
+  const byId = new Map(selesai.map((m) => [m.id, m]));
+  return TEAM_CODES.flatMap((team) => (teams[team] || []).map((mem) => {
+    const lagaTim = selesai.filter((m) => m.home === team || m.away === team).length;
+    const rows = playerStats.filter((p) => p.user_id === mem.userId && p.hadir && byId.has(p.match_id));
+    let gol = 0, assist = 0, cs = 0, kebobolan = 0, kartu = 0;
+    rows.forEach((p) => {
+      const m = byId.get(p.match_id)!;
+      gol += p.gol || 0; assist += p.assist || 0; kartu += FAIRPLAY_POIN[p.kartu] || 0;
+      if (mem.posisi === "GK") { kebobolan += p.kebobolan || 0; if (!p.kebobolan) cs++; }
+      else if ((p.team === m.home ? m.sa : m.sh) === 0) cs++;
+    });
+    const main = rows.length;
+    const penuh = lagaTim > 0 && main >= lagaTim;
+    const poin = main * POIN_PEMAIN.hadir + (penuh ? POIN_PEMAIN.hadirPenuh : 0)
+      + gol * (POIN_PEMAIN.gol[mem.posisi] || 0) + assist * (POIN_PEMAIN.assist[mem.posisi] || 0)
+      + cs * (POIN_PEMAIN.cleanSheet[mem.posisi] || 0) - kartu;
+    return { userId: mem.userId, team, posisi: mem.posisi, main, lagaTim, penuh, gol, assist, cs, kebobolan, kartu, poin };
+  }));
+}
+
+/** Urut penghargaan: poin, lalu gol+assist, lalu laga dihadiri, lalu kartu paling sedikit. */
+export function urutPoin(a: RekapPemain, b: RekapPemain) {
+  return b.poin - a.poin || (b.gol + b.assist) - (a.gol + a.assist) || b.main - a.main || a.kartu - b.kartu;
+}
+
 export const TEAM_CODES = ["A", "B", "C", "D"] as const;
 export const TEAM_DISPLAY: Record<string, string> = {
   A: "Ampicilin FC",

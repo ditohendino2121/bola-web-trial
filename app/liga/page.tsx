@@ -11,7 +11,7 @@ const POSISI = ["GK", "Belakang", "Tengah", "Depan"] as const;
 export default function LigaPage() {
   const { db, error, reload } = useDB();
   const [busy, setBusy] = useState(false);
-  const [edTanggal, setEdTanggal] = useState(""); const [edLabel, setEdLabel] = useState("");
+  const [edTanggal, setEdTanggal] = useState(""); const [edLabel, setEdLabel] = useState(""); const [edJam, setEdJam] = useState("20:00-22:00");
   const [manualUser, setManualUser] = useState(""); const [manualPos, setManualPos] = useState(""); const [manualTeam, setManualTeam] = useState("A");
   const [matchForm, setMatchForm] = useState<Record<string, { home: string; away: string }>>({});
 
@@ -82,12 +82,13 @@ export default function LigaPage() {
   // membatasi 6 edisi, mengikuti permintaan eksplisit saat redesign.
   const buatEdisi = () => run(async () => {
     if (!edTanggal) return alert("Pilih tanggal edisi dulu.");
+    if (!edJam.trim()) return alert("Isi jam edisi dulu.");
     const label = edLabel || `Edisi ${edTanggal}`;
     const { data: ed, error: e1 } = await supa().from("league_editions").insert({ label, tanggal: edTanggal }).select().single();
     if (e1) throw new Error(e1.message);
-    const { error: e2 } = await supa().from("schedules").insert({ tanggal: edTanggal, jam: "20:00-22:00", lokasi: `Liga ${label}`, kuota: 28, status: "buka", is_liga: true, edition_id: ed.id });
+    const { error: e2 } = await supa().from("schedules").insert({ tanggal: edTanggal, jam: edJam.trim(), lokasi: `Liga ${label}`, kuota: 28, status: "buka", is_liga: true, edition_id: ed.id });
     if (e2) throw new Error(e2.message);
-    setEdTanggal(""); setEdLabel("");
+    setEdTanggal(""); setEdLabel(""); setEdJam("20:00-22:00");
   });
   const hapusEdisi = (id: string) => { if (!confirm("Hapus edisi ini beserta semua pertandingannya?")) return; run(async () => { const { error: e } = await supa().from("league_editions").delete().eq("id", id); if (e) throw new Error(e.message); }); };
 
@@ -179,6 +180,7 @@ export default function LigaPage() {
               <div className="grid2">
                 <label className="field"><span>Tanggal edisi</span><input type="date" value={edTanggal} onChange={(e) => setEdTanggal(e.target.value)} /></label>
                 <label className="field"><span>Label</span><input placeholder="cth: Hari 1 — 25 Okt 2026" value={edLabel} onChange={(e) => setEdLabel(e.target.value)} /></label>
+                <label className="field"><span>Jam</span><input placeholder="20:00-22:00" value={edJam} onChange={(e) => setEdJam(e.target.value)} /></label>
               </div>
               <button className="btn" disabled={busy || !edTanggal} onClick={buatEdisi}>Buat edisi dan jadwal</button>
             </div>
